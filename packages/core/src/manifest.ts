@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 export const RectSchema = z.object({
   x: z.number(), y: z.number(), w: z.number(), h: z.number(),
@@ -64,3 +66,13 @@ export const ManifestSchema = z.object({
   }).optional(),
 });
 export type Manifest = z.infer<typeof ManifestSchema>;
+
+export function loadManifest(projectDir: string): Manifest {
+  const raw = readFileSync(join(projectDir, "manifest.json"), "utf8");
+  return ManifestSchema.parse(JSON.parse(raw));
+}
+
+export function saveManifest(projectDir: string, m: Manifest): void {
+  const valid = ManifestSchema.parse(m);
+  writeFileSync(join(projectDir, "manifest.json"), JSON.stringify(valid, null, 2));
+}
