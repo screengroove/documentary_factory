@@ -12,5 +12,17 @@ try {
   // No root .env present — rely on whatever is already in process.env.
 }
 
-const config: NextConfig = { typescript: { ignoreBuildErrors: false } };
+const config: NextConfig = {
+  typescript: { ignoreBuildErrors: false },
+  // @doc/core ships raw TS (its package.json "main" is ./src/index.ts) using
+  // ESM ".js" import specifiers that resolve to ".ts" files. transpilePackages
+  // makes SWC compile the workspace package; extensionAlias makes webpack resolve
+  // those ".js" specifiers to the actual ".ts"/".tsx" source files.
+  transpilePackages: ["@doc/core"],
+  experimental: {
+    extensionAlias: {
+      ".js": [".ts", ".tsx", ".js", ".jsx"],
+    },
+  },
+};
 export default config;
