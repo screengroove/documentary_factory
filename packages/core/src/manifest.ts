@@ -76,3 +76,11 @@ export function saveManifest(projectDir: string, m: Manifest): void {
   const valid = ManifestSchema.parse(m);
   writeFileSync(join(projectDir, "manifest.json"), JSON.stringify(valid, null, 2));
 }
+
+export function canRun(m: Manifest, stage: StageName): boolean {
+  const idx = STAGE_NAMES.indexOf(stage);
+  for (let i = 0; i < idx; i++) {
+    if (m.stages[STAGE_NAMES[i]].status !== "approved") return false;
+  }
+  return true;
+}
