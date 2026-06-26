@@ -1,0 +1,41 @@
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { Input, ALL_FORMATS, FilePathSource } from "mediabunny";
+import { loadManifest, saveManifest } from "../manifest.js";
+import { projectPaths } from "../project.js";
+import type { StageDeps } from "./deps.js";
+
+export const DEFAULT_VOICE_ID = "af_sarah"; // Kokoro voice; "bf_emma" / "am_michael" also suit narration
+
+// Measure the real audio length so the Sequence covers trailing silence, not just
+// the last spoken word (remotion-best-practices: get-audio-duration). Injectable for tests.
+export async function audioDurationSec(filePath: string): Promise<number> {
+  const input = new Input({ formats: ALL_FORMATS, source: new FilePathSource(filePath) });
+  return input.computeDuration();
+}
+
+export async function runVoiceover(
+  projectDir: string,
+  deps: StageDeps,
+  opts: { voiceId?: string; getDuration?: (filePath: string) => Promise<number> } = {},
+): Promise<void> {
+  const voiceId = opts.voiceId ?? DEFAULT_VOICE_ID;
+  const getDuration = opts.getDuration ?? audioDurationSec;
+  const m = loadManifest(projectDir);
+
+  m.stages.voiceover.status = "running";
+  saveManifest(projectDir, m);
+
+  for (const seg of m.segments) {
+    if (seg.audio) continue;
+    const { audio, words } = await deps.tts.speak({ text: seg.narration, voiceId });
+    const filePath = join(projectPaths(projectDir).audio, `${seg.id}.wav`);
+    writeFileSync(filePath, audio);
+    const durationSec = await getDuration(filePath);
+    seg.audio = { path: `assets/audio/${seg.id}.wav`, durationSec, words };
+    saveManifest(projectDir, m); // persist per-segment
+  }
+
+  m.stages.voiceover.status = "awaiting_review";
+  saveManifest(projectDir, m);
+}
