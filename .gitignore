@@ -5,4 +5,6 @@ projects/*/assets/
 projects/*/out/
 projects/*/runs/
 .next/
+next-env.d.ts
+*.tsbuildinfo
 .DS_Store
