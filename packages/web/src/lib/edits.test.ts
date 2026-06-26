@@ -16,8 +16,23 @@ afterEach(() => { for (const d of dirs) rmSync(d, { recursive: true, force: true
 
 test("approveStage marks the stage approved", () => {
   const dir = proj();
+  const m = loadManifest(dir);
+  m.stages.script.status = "awaiting_review";
+  saveManifest(dir, m);
   approveStage(dir, "script");
   expect(loadManifest(dir).stages.script.status).toBe("approved");
+});
+
+test("approveStage refuses to approve a stage that is not awaiting_review", () => {
+  const dir = proj();
+  // Freshly created: script is "pending" — must not be approvable.
+  expect(() => approveStage(dir, "script")).toThrow(/awaiting_review/);
+
+  // An errored stage must not be approvable either (the bug that corrupted a project).
+  const m = loadManifest(dir);
+  m.stages.shotlist.status = "error";
+  saveManifest(dir, m);
+  expect(() => approveStage(dir, "shotlist")).toThrow(/awaiting_review/);
 });
 
 test("editNarration updates text before script approval", () => {

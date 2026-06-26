@@ -43,6 +43,21 @@ test("adds a shot with style-suffixed prompt to each segment", async () => {
   expect(m.stages.shotlist.status).toBe("awaiting_review");
 });
 
+test("uses a default Ken Burns move when the model omits one", async () => {
+  const dir = projectWithSegments();
+  const deps = makeFakeDeps({
+    // Model returns a prompt but no kenBurns — must not crash the stage.
+    llm: { complete: async ({ schema }) => schema.parse({ imagePrompt: "a tower at dusk" }) },
+  });
+
+  await runShotlist(dir, deps);
+
+  const m = loadManifest(dir);
+  expect(m.segments[0].shot?.kenBurns).toBeDefined();
+  expect(m.segments[0].shot?.kenBurns.to.w).toBe(0.9); // default gentle zoom
+  expect(m.stages.shotlist.status).toBe("awaiting_review");
+});
+
 test("skips segments that already have a shot", async () => {
   const dir = projectWithSegments();
   let calls = 0;

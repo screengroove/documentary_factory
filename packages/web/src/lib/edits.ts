@@ -2,6 +2,13 @@ import { loadManifest, saveManifest, type StageName } from "@doc/core";
 
 export function approveStage(dir: string, stage: StageName): void {
   const m = loadManifest(dir);
+  // A stage only reaches "awaiting_review" after its Run completed for every
+  // segment. Refusing any other status stops a reviewer from approving past an
+  // error/incomplete run, which previously left projects unrenderable.
+  if (m.stages[stage].status !== "awaiting_review")
+    throw new Error(
+      `Cannot approve ${stage}: status is "${m.stages[stage].status}", expected "awaiting_review". Run the stage first.`,
+    );
   if (stage === "images")
     for (const s of m.segments) if (s.image) { s.image.approved = true; delete s.image.needsRegen; }
   m.stages[stage].status = "approved";

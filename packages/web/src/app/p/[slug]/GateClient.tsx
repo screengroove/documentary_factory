@@ -6,14 +6,20 @@ const ORDER: StageName[] = ["script", "shotlist", "images", "voiceover", "assemb
 
 export function GateClient({ slug, initial }: { slug: string; initial: Manifest }) {
   const [m, setM] = useState(initial);
+  const [actionError, setActionError] = useState<string | null>(null);
   const refresh = async () =>
     setM(await (await fetch(`/api/projects/${slug}/manifest`)).json());
 
   const post = async (path: string, body: unknown) => {
-    await fetch(`/api/projects/${slug}/${path}`, {
+    setActionError(null);
+    const res = await fetch(`/api/projects/${slug}/${path}`, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setActionError(data.error ?? `Request to ${path} failed (${res.status})`);
+    }
     await refresh();
   };
 
@@ -25,6 +31,7 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
       <h1>{slug}</h1>
       <p>Current stage: <b>{current}</b> — status: {m.stages[current].status}</p>
       {m.stages[current].error && <p style={{ color: "crimson" }}>Error: {m.stages[current].error}</p>}
+      {actionError && <p style={{ color: "crimson" }}>Action failed: {actionError}</p>}
 
       <div style={{ display: "flex", gap: 8, margin: "12px 0" }}>
         <button onClick={() => post("run", { stage: current })}>Run “{current}”</button>
