@@ -1,10 +1,11 @@
 import { afterEach, expect, test } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createProject } from "../project.js";
 import { loadManifest, saveManifest, type Still } from "../manifest.js";
 import { runAssemble, buildInputProps } from "./assemble.js";
+import { CATALOG } from "../music/catalog.js";
 
 const dirs: string[] = [];
 const kb = { from: { x: 0, y: 0, w: 1, h: 1 }, to: { x: 0.1, y: 0.1, w: 0.8, h: 0.8 } };
@@ -32,6 +33,7 @@ function projectWith(specs: Array<{ durationSec: number; weights: number[] }>) {
   saveManifest(dir, m);
   return dir;
 }
+
 afterEach(() => { for (const d of dirs) rmSync(d, { recursive: true, force: true }); });
 
 test("computes total duration from audio", async () => {
@@ -112,4 +114,30 @@ test("each still carries its own image path and ken burns", () => {
   expect(seg.stills[0].imagePath).toBe("assets/images/seg-0.png");
   expect(seg.stills[1].imagePath).toBe("assets/images/seg-1.png");
   expect(seg.stills[0].kenBurns.to.w).toBe(0.8);
+});
+
+test("runAssemble auto-picks a soundtrack and copies it into the project", async () => {
+  const dir = projectWith([{ durationSec: 2, weights: [1] }]);
+  // brief.tone defaults to "w" in projectWith — set a real tone for a deterministic pick
+  const pre = loadManifest(dir); pre.brief.tone = "tense, urgent"; saveManifest(dir, pre);
+
+  await runAssemble(dir);
+
+  const m = loadManifest(dir);
+  expect(m.music?.trackId).toBe("schellekens-medieval");
+  expect(m.music?.path).toBe("assets/music/schellekens-medieval.mp3");
+  expect(m.music?.volume).toBe(0.15);
+  expect(existsSync(join(dir, "assets/music/schellekens-medieval.mp3"))).toBe(true);
+});
+
+test("runAssemble respects an already-chosen track", async () => {
+  const dir = projectWith([{ durationSec: 2, weights: [1] }]);
+  const pre = loadManifest(dir);
+  pre.music = { trackId: "mamoun-statement-1", path: "assets/music/mamoun-statement-1.mp3", volume: 0.2 };
+  saveManifest(dir, pre);
+
+  await runAssemble(dir);
+
+  expect(loadManifest(dir).music?.trackId).toBe("mamoun-statement-1");
+  expect(loadManifest(dir).music?.volume).toBe(0.2);
 });

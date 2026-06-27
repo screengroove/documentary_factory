@@ -1,7 +1,12 @@
+import { copyFileSync } from "node:fs";
+import { join } from "node:path";
 import { loadManifest, saveManifest, type Manifest, type Rect } from "../manifest.js";
 import type { Word } from "../providers/types.js";
+import { projectPaths } from "../project.js";
+import { CATALOG, pickTrack, trackSourcePath } from "../music/catalog.js";
 
 const FPS = 30;
+export const DEFAULT_MUSIC_VOLUME = 0.15;
 
 export type DocumentaryProps = {
   fps: number;
@@ -76,11 +81,22 @@ export function buildInputProps(m: Manifest): DocumentaryProps {
   };
 }
 
-export async function runAssemble(projectDir: string, _deps?: unknown): Promise<void> {
+export async function runAssemble(
+  projectDir: string,
+  opts: { musicLibDir?: string } = {},
+): Promise<void> {
   const m = loadManifest(projectDir);
   for (const s of m.segments) {
     if (!s.audio) throw new Error(`Segment ${s.id} has no audio; run voiceover first`);
   }
+
+  // Auto-pick a soundtrack on first assemble; respect an existing/overridden choice.
+  if (!m.music && CATALOG.length > 0) {
+    const track = pickTrack(m.brief.tone);
+    copyFileSync(trackSourcePath(track, opts.musicLibDir), join(projectPaths(projectDir).music, track.file));
+    m.music = { trackId: track.id, path: `assets/music/${track.file}`, volume: DEFAULT_MUSIC_VOLUME };
+  }
+
   const totalDurationSec = m.segments.reduce((sum, s) => sum + (s.audio?.durationSec ?? 0), 0);
   m.timeline = { fps: FPS, totalDurationSec };
   m.stages.assemble.status = "awaiting_review";
