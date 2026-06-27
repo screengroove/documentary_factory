@@ -7,8 +7,13 @@ import type { TtsClient, Word } from "./types.js";
 // REPLICATE_API_TOKEN already used for images. WhisperX re-transcribes the audio
 // to align — accurate enough for narration captions.
 
-const KOKORO = "jaaari/kokoro-82m";
-const WHISPERX = "victor-upmeet/whisperx";
+// Kokoro and WhisperX are community models, so they must be called with an
+// explicit version hash via the versioned-prediction endpoint. The bare
+// "owner/name" form hits POST /v1/models/{owner}/{name}/predictions, which only
+// exists for Replicate's official serverless models (e.g. Flux) and 404s here.
+// Update these hashes from each model's "Versions" tab if a newer one is needed.
+const KOKORO = "jaaari/kokoro-82m:f559560eb822dc509045f3921a1921234918b91739db4bf3daab2169b71c7a13";
+const WHISPERX = "victor-upmeet/whisperx:655845d6190ef70573c669245f245892cd039df4b880a1e3a65852c09252f5cc";
 
 type WhisperXOutput = {
   segments: Array<{ words?: Array<{ word: string; start?: number; end?: number }> }>;
