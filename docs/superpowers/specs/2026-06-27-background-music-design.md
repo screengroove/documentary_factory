@@ -51,16 +51,21 @@ export type Track = {
 export const CATALOG: Track[] = [ /* entries below */ ];
 ```
 
-### Proposed initial catalog (researched; verify each before shipping)
+### Initial catalog (researched; **bold** = file fetched + verified, in `packages/core/assets/music/`)
 
-| id | Mood tags | Piece | Composer | Source / License |
-|---|---|---|---|---|
-| `mamoun-statement-1` | contemplative, reflective | Statement No.1 for solo piano | John Mamoun | Internet Archive, Public Domain |
-| `chopin-op28-4` | somber, melancholic | Prelude in E minor, Op. 28 No. 4 | Chopin | Orange Free Sounds, PD recording |
-| `schubert-d899-3` | hopeful, serene, uplifting | Impromptu in G‑flat, D. 899 No. 3 | Schubert | Musopen, PD/CC0 |
-| `schellekens-medieval` | tense, dramatic | Medieval Theme | Maarten Schellekens | Free Music Archive, CC0 |
-| `beethoven-op132-slow` | stately, neutral | String Quartet No. 15, Op. 132 (slow mvt) | Beethoven | Musopen (European Archive rec.) |
-| `schumann-poet-speaks` | wistful, nostalgic | Scenes from Childhood, Op. 15 — "The Poet Speaks" | Schumann | Musopen / Creazilla |
+| id | Mood tags | Piece / Composer | Source URL | License | File |
+|---|---|---|---|---|---|
+| **`mamoun-statement-1`** | contemplative, reflective | Statement No.1 for solo piano — J. Mamoun | https://archive.org/details/Statement1 | **Public Domain Mark 1.0** (work + recording) | ✅ `mamoun-statement-1.mp3` (~18s) |
+| **`schellekens-medieval`** | tense, dramatic | Medieval Theme — M. Schellekens | https://freemusicarchive.org/music/maarten-schellekens/public-domain-1/medieval-theme | **CC0** | ✅ `schellekens-medieval.mp3` (~2:37) |
+| `chopin-op28-4` | somber, melancholic | Prelude in E minor, Op. 28 No. 4 — Chopin | https://orangefreesounds.com/prelude-in-e-minor/ | "Public Domain" (verify) | ⬜ pending |
+| `schubert-d899-3` | hopeful, serene, uplifting | Impromptu in G‑flat, D. 899 No. 3 — Schubert | https://musopen.org/ (search "Schubert 4 Impromptus D.899") | per-recording PD/CC0/CC BY‑SA (verify) | ⬜ pending |
+| `beethoven-op132-slow` | stately, neutral | String Quartet No. 15, Op. 132 (slow mvt) — Beethoven | https://musopen.org/music/2623-string-quartet-no-15-in-a-minor-op-132/ | per-recording (verify) | ⬜ pending |
+| `schumann-poet-speaks` | wistful, nostalgic | Scenes from Childhood, Op. 15 — "The Poet Speaks" — Schumann | https://musopen.org/ (search "Schumann Scenes from Childhood") | per-recording (verify) | ⬜ pending |
+
+The two vetted tracks are enough to exercise the full pipeline (one short → tests
+looping, one long → tests trim/fade). `pickTrack` and the UI degrade gracefully
+while the other four rows are file-less. Per-track source + license is recorded in
+`packages/core/assets/music/ATTRIBUTION.md`.
 
 **Licensing caveat (must surface to user):** for classical music the *composition*
 is public domain but the *recording* frequently is not. The recordings above are
