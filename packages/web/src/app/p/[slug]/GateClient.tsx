@@ -3,20 +3,24 @@ import { useState } from "react";
 import type { Manifest, StageName } from "@doc/core";
 
 const ORDER: StageName[] = ["script", "shotlist", "images", "voiceover", "assemble"];
+const GATE_NO: Record<StageName, string> = { script: "1", shotlist: "2", images: "3", voiceover: "4", assemble: "5" };
 
 // The active stage is the first one not yet approved — the only stage you can act on.
 function activeStage(m: Manifest): StageName {
   return ORDER.find((s) => m.stages[s].status !== "approved") ?? "assemble";
 }
 
-function glyph(status: string): string {
-  switch (status) {
-    case "approved": return "✓";
-    case "awaiting_review": return "●";
-    case "running": return "…";
-    case "error": return "!";
-    default: return "○"; // pending / not yet reached
-  }
+const STATUS_META: Record<string, { label: string; mod: string; color: string }> = {
+  pending:         { label: "Pending",         mod: "badge--pending",  color: "var(--status-pending)" },
+  running:         { label: "Running",         mod: "badge--running",  color: "var(--status-running)" },
+  awaiting_review: { label: "Awaiting review", mod: "badge--review",   color: "var(--status-review)" },
+  approved:        { label: "Approved",        mod: "badge--approved", color: "var(--status-approved)" },
+  error:           { label: "Error",           mod: "badge--error",    color: "var(--status-error)" },
+};
+
+function StatusBadge({ status }: { status: string }) {
+  const meta = STATUS_META[status] ?? STATUS_META.pending;
+  return <span className={`badge ${meta.mod}`}><span className="dot" />{meta.label}</span>;
 }
 
 export function GateClient({ slug, initial }: { slug: string; initial: Manifest }) {
@@ -26,7 +30,7 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
   const [busy, setBusy] = useState<string | null>(null);
 
   const active = activeStage(m);
-  const editable = viewing === active; // you can only act on the active stage
+  const editable = viewing === active;
   const viewIdx = ORDER.indexOf(viewing);
 
   const refresh = async (): Promise<Manifest> => {
@@ -49,8 +53,7 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
   };
 
   // Run/render hold the request open for the whole batch (minutes for images/audio).
-  // Stages persist the manifest per-segment, so poll while in flight to stream
-  // progress in, and show a busy banner so the UI never looks stalled/broken.
+  // Stages persist per-segment, so poll while in flight to stream progress in.
   const longPost = async (path: string, body: unknown, label: string): Promise<Manifest> => {
     setActionError(null);
     setBusy(label);
@@ -71,138 +74,228 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
     return refresh();
   };
 
-  // Approving the active stage advances the pipeline — follow it to the next gate.
   const approve = async () => {
     const man = await post("approve", { stage: active });
     setViewing(activeStage(man));
   };
 
-  const viewingStage = m.stages[viewing];
+  const viewingStatus = m.stages[viewing].status;
 
   return (
-    <main style={{ padding: 24, fontFamily: "system-ui", maxWidth: 900 }}>
-      <h1>{slug}</h1>
+    <main style={{ minHeight: "100vh", background: "var(--surface-app)" }}>
+      {/* Header */}
+      <header style={{ padding: "32px 48px 24px", borderBottom: "1px solid var(--border-hairline)",
+        background: "radial-gradient(120% 140% at 0% 0%, rgba(79,143,247,0.06), transparent 60%)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+          <a href="/" className="mono" style={{ fontSize: 12, color: "var(--text-meta)" }}>← projects</a>
+        </div>
+        <h1 className="mono" style={{ fontSize: 20, fontWeight: 600, color: "var(--text-heading)",
+          letterSpacing: "-0.01em", wordBreak: "break-word" }}>{slug}</h1>
+      </header>
 
-      {/* Stepper: jump to any stage */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", margin: "12px 0" }}>
-        {ORDER.map((s, i) => {
-          const isViewing = s === viewing;
-          const isActive = s === active;
-          return (
-            <span key={s} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button
-                onClick={() => setViewing(s)}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  border: isViewing ? "2px solid #2563eb" : "1px solid #ccc",
-                  background: isActive ? "#eef2ff" : "white",
-                  fontWeight: isActive ? 700 : 400,
-                }}
-              >
-                {isActive ? "▶ " : ""}{glyph(m.stages[s].status)} {s}
-              </button>
-              {i < ORDER.length - 1 && <span style={{ color: "#bbb" }}>—</span>}
-            </span>
-          );
-        })}
+      <div style={{ padding: "28px 48px", maxWidth: 980, display: "flex", flexDirection: "column", gap: 24 }}>
+
+        {/* Stage stepper */}
+        <div className="ds-card" style={{ padding: "26px 20px" }}>
+          <div style={{ display: "flex", alignItems: "flex-start" }}>
+            {ORDER.map((s, i) => {
+              const st = m.stages[s].status;
+              const meta = STATUS_META[st] ?? STATUS_META.pending;
+              const isActive = s === active;
+              const isViewing = s === viewing;
+              const connectColor = st === "approved" ? "var(--status-approved)"
+                : st === "running" ? "var(--status-running)" : "var(--border-card)";
+              return (
+                <button key={s} onClick={() => setViewing(s)}
+                  style={{ all: "unset", cursor: "pointer", flex: 1, display: "flex", flexDirection: "column",
+                    alignItems: "center", textAlign: "center", position: "relative" }}>
+                  {/* left connector */}
+                  {i > 0 && (
+                    <span style={{ position: "absolute", top: 13, left: "-50%", right: "50%", height: 2,
+                      background: connectColor, opacity: connectColor === "var(--border-card)" ? 1 : 0.5 }} />
+                  )}
+                  {/* node circle */}
+                  <span style={{ position: "relative", zIndex: 1, width: 28, height: 28, borderRadius: "50%",
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
+                    background: st === "pending" ? "var(--color-bg-elevated)" : (meta.color + "00") || "transparent",
+                    backgroundColor: st === "pending" ? "var(--color-bg-elevated)"
+                      : st === "approved" ? "var(--status-approved-tint)"
+                      : st === "running" ? "var(--status-running-tint)"
+                      : st === "awaiting_review" ? "var(--status-review-tint)"
+                      : st === "error" ? "var(--status-error-tint)" : "var(--color-bg-elevated)",
+                    border: `1.5px solid ${st === "pending" ? "var(--border-card)" : meta.color}`,
+                    color: meta.color,
+                    boxShadow: isViewing ? "0 0 0 3px var(--focus-ring)" : undefined }}>
+                    {st === "approved" ? "✓"
+                      : st === "error" ? "!"
+                      : st === "running" ? <span style={{ width: 12, height: 12, borderRadius: "50%",
+                          border: "2px solid var(--status-running)", borderTopColor: "transparent",
+                          animation: "ds-spin 0.8s linear infinite" }} />
+                      : st === "awaiting_review" ? <span style={{ width: 8, height: 8, borderRadius: "50%", background: meta.color }} />
+                      : <span className="mono" style={{ fontSize: 11, color: "var(--text-faint)" }}>{GATE_NO[s]}</span>}
+                  </span>
+                  <span style={{ marginTop: 10, fontSize: 12, fontWeight: 600,
+                    color: st === "pending" ? "var(--text-meta)" : "var(--text-heading)" }}>
+                    {isActive ? "▶ " : ""}{s}
+                  </span>
+                  <span className="mono" style={{ fontSize: 10, marginTop: 2, color: meta.color }}>{st}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Gate header + nav */}
+        <div className="ds-card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 16, padding: "16px 18px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <span className="chip">Gate {GATE_NO[viewing]}</span>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-heading)", letterSpacing: "-0.01em" }}>
+                {viewing}{editable ? "" : " · read-only"}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+                <button className="btn btn--ghost btn--sm" disabled={viewIdx === 0}
+                  onClick={() => setViewing(ORDER[viewIdx - 1])}>‹ Prev</button>
+                <button className="btn btn--ghost btn--sm" disabled={viewIdx === ORDER.length - 1}
+                  onClick={() => setViewing(ORDER[viewIdx + 1])}>Next ›</button>
+              </div>
+            </div>
+          </div>
+          <StatusBadge status={viewingStatus} />
+        </div>
+
+        {/* Messages */}
+        {m.stages[viewing].error && (
+          <div className="ds-card" style={{ padding: "12px 16px", borderColor: "var(--status-error-border)",
+            background: "var(--status-error-tint)", color: "var(--status-error)" }}>
+            Error: {m.stages[viewing].error}
+          </div>
+        )}
+        {actionError && (
+          <div className="ds-card" style={{ padding: "12px 16px", borderColor: "var(--status-error-border)",
+            background: "var(--status-error-tint)", color: "var(--status-error)" }}>
+            Action failed: {actionError}
+          </div>
+        )}
+        {busy && (
+          <div className="ds-card" style={{ padding: "12px 16px", borderColor: "var(--status-running-border)",
+            background: "var(--status-running-tint)", color: "var(--status-running)", display: "flex",
+            alignItems: "center", gap: 10 }}>
+            <span style={{ width: 13, height: 13, borderRadius: "50%", border: "2px solid var(--status-running)",
+              borderTopColor: "transparent", animation: "ds-spin 0.8s linear infinite" }} />
+            {busy} — this can take a minute or two; results stream in as they finish.
+          </div>
+        )}
+
+        {/* Action bar */}
+        {editable ? (
+          <div style={{ display: "flex", gap: 12 }}>
+            <button className="btn btn--primary" disabled={!!busy}
+              onClick={() => longPost("run", { stage: active }, `Running “${active}”`)}>Run “{active}”</button>
+            <button className="btn btn--secondary" disabled={!!busy} onClick={approve}>Approve “{active}”</button>
+            {active === "assemble" && m.stages.voiceover.status === "approved" && (
+              <button className="btn btn--primary" disabled={!!busy}
+                onClick={() => longPost("render", {}, "Rendering video")}>Render video</button>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--text-meta)", fontSize: 13 }}>
+            Read-only — this isn’t the active stage.
+            <button className="btn btn--secondary btn--sm" onClick={() => setViewing(active)}>Go to active ({active})</button>
+          </div>
+        )}
+
+        {/* ── Panels ── */}
+        {/* Gate 1: script */}
+        {viewing === "script" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {m.segments.map((s) => (
+              <div key={s.id} className="ds-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+                <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)" }}>{s.id}</span>
+                {editable
+                  ? <textarea className="textarea" rows={3} defaultValue={s.narration}
+                      onBlur={(e) => post("segments", { op: "editNarration", id: s.id, text: e.target.value })} />
+                  : <p style={{ margin: 0, whiteSpace: "pre-wrap", color: "var(--text-body)", lineHeight: 1.55 }}>{s.narration}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Gate 2: shotlist */}
+        {viewing === "shotlist" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {m.segments.map((s) => (
+              <div key={s.id} className="ds-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+                <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)" }}>{s.id}</span>
+                {editable
+                  ? <input className="input" defaultValue={s.shot?.imagePrompt ?? ""}
+                      onBlur={(e) => post("segments", { op: "editPrompt", id: s.id, prompt: e.target.value })} />
+                  : <p style={{ margin: 0, color: s.shot ? "var(--text-body)" : "var(--text-disabled)" }}>
+                      {s.shot?.imagePrompt ?? "— not generated yet —"}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Gate 3: images */}
+        {viewing === "images" && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
+            {m.segments.map((s) => (
+              <figure key={s.id} className="ds-card" style={{ margin: 0, padding: 10, overflow: "hidden" }}>
+                {s.image
+                  ? <img src={`/api/assets/${slug}/images/${s.id}.png`} alt={s.id}
+                      style={{ width: "100%", borderRadius: "var(--radius-sm)", display: "block",
+                        border: "1px solid var(--border-hairline)" }} />
+                  : <div style={{ width: "100%", aspectRatio: "16/9", borderRadius: "var(--radius-sm)",
+                      background: "var(--surface-code)", border: "1px solid var(--border-hairline)", display: "grid",
+                      placeItems: "center", color: "var(--text-disabled)", fontSize: 12 }}>not generated</div>}
+                <figcaption style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                  marginTop: 8 }}>
+                  <span className="mono" style={{ fontSize: 11, color: "var(--text-meta)" }}>{s.id}</span>
+                  {editable && (
+                    <button className="btn btn--secondary btn--sm" disabled={!!busy}
+                      onClick={() => post("segments", { op: "rejectImage", id: s.id, seed: s.image?.seed ? s.image.seed + 1 : 1 })}>
+                      ⟳ Regenerate</button>
+                  )}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        )}
+
+        {/* Gate 4: voiceover */}
+        {viewing === "voiceover" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {m.segments.map((s) => (
+              <div key={s.id} className="ds-card" style={{ padding: 14, display: "flex", alignItems: "center",
+                gap: 14, flexWrap: "wrap" }}>
+                <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)", flex: "none" }}>{s.id}</span>
+                <span style={{ flex: 1, minWidth: 160, color: "var(--text-body)" }}>{s.narration.slice(0, 56)}…</span>
+                {s.audio
+                  ? <audio controls src={`/api/assets/${slug}/audio/${s.id}.wav`} style={{ height: 34 }} />
+                  : <span style={{ color: "var(--text-disabled)", fontSize: 13 }}>— not generated yet —</span>}
+                {editable && (
+                  <button className="btn btn--secondary btn--sm" disabled={!!busy}
+                    onClick={() => post("segments", { op: "rejectAudio", id: s.id })}>Re-record</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Gate 5: assemble */}
+        {viewing === "assemble" && (
+          <div className="ds-card" style={{ padding: 20, color: "var(--text-body)" }}>
+            {m.timeline
+              ? <span className="mono" style={{ color: "var(--color-cyan)", fontSize: 13 }}>
+                  timeline · {m.segments.length} segments · {m.timeline.totalDurationSec.toFixed(1)}s @ {m.timeline.fps}fps</span>
+              : "Run assemble to derive the timeline, then Render video."}
+          </div>
+        )}
+
+        <div style={{ height: 16 }} />
       </div>
-
-      {/* Prev / Next */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "8px 0" }}>
-        <button disabled={viewIdx === 0} onClick={() => setViewing(ORDER[viewIdx - 1])}>‹ Prev</button>
-        <span>Viewing: <b>{viewing}</b> — status: {viewingStage.status}{editable ? " (active)" : ""}</span>
-        <button disabled={viewIdx === ORDER.length - 1} onClick={() => setViewing(ORDER[viewIdx + 1])}>Next ›</button>
-      </div>
-
-      {viewingStage.error && <p style={{ color: "crimson" }}>Error: {viewingStage.error}</p>}
-      {actionError && <p style={{ color: "crimson" }}>Action failed: {actionError}</p>}
-      {busy && (
-        <p style={{ color: "#2563eb", margin: "8px 0" }}>
-          ⏳ {busy} — this can take a minute or two; results stream in as they finish.
-        </p>
-      )}
-
-      {/* Action bar — only on the active stage; otherwise read-only notice */}
-      {editable ? (
-        <div style={{ display: "flex", gap: 8, margin: "12px 0" }}>
-          <button disabled={!!busy} onClick={() => longPost("run", { stage: active }, `Running “${active}”`)}>
-            Run “{active}”
-          </button>
-          <button disabled={!!busy} onClick={approve}>Approve “{active}”</button>
-          {active === "assemble" && m.stages.voiceover.status === "approved" && (
-            <button disabled={!!busy} onClick={() => longPost("render", {}, "Rendering video")}>Render video</button>
-          )}
-        </div>
-      ) : (
-        <p style={{ color: "#666", margin: "12px 0" }}>
-          Read-only — this isn’t the active stage.{" "}
-          <button onClick={() => setViewing(active)}>Go to active stage ({active})</button>
-        </p>
-      )}
-
-      {/* Gate 1: script */}
-      {viewing === "script" && m.segments.map((s) => (
-        <div key={s.id} style={{ marginBottom: 8 }}>
-          {editable ? (
-            <textarea defaultValue={s.narration} style={{ width: "100%" }}
-              onBlur={(e) => post("segments", { op: "editNarration", id: s.id, text: e.target.value })} />
-          ) : (
-            <p style={{ whiteSpace: "pre-wrap" }}>{s.narration}</p>
-          )}
-        </div>
-      ))}
-
-      {/* Gate 2: shotlist (image prompts) */}
-      {viewing === "shotlist" && m.segments.map((s) => (
-        <div key={s.id} style={{ marginBottom: 8 }}>
-          {editable ? (
-            <input defaultValue={s.shot?.imagePrompt ?? ""} style={{ width: "100%" }}
-              onBlur={(e) => post("segments", { op: "editPrompt", id: s.id, prompt: e.target.value })} />
-          ) : (
-            <p style={{ color: s.shot ? "inherit" : "#999" }}>{s.shot?.imagePrompt ?? "— not generated yet —"}</p>
-          )}
-        </div>
-      ))}
-
-      {/* Gate 3: images */}
-      {viewing === "images" && m.segments.map((s) => (
-        <figure key={s.id} style={{ display: "inline-block", margin: 8 }}>
-          {s.image
-            ? <img src={`/api/assets/${slug}/images/${s.id}.png`} width={240} alt={s.id} />
-            : <div style={{ width: 240, height: 135, background: "#f0f0f0", display: "grid", placeItems: "center", color: "#999" }}>not generated</div>}
-          {editable && (
-            <figcaption>
-              <button disabled={!!busy} onClick={() => post("segments", { op: "rejectImage", id: s.id, seed: s.image?.seed ? s.image.seed + 1 : 1 })}>
-                Regenerate
-              </button>
-            </figcaption>
-          )}
-        </figure>
-      ))}
-
-      {/* Gate 4: voiceover */}
-      {viewing === "voiceover" && m.segments.map((s) => (
-        <div key={s.id} style={{ marginBottom: 8 }}>
-          <span>{s.narration.slice(0, 40)}… </span>
-          {s.audio
-            ? <audio controls src={`/api/assets/${slug}/audio/${s.id}.wav`} />
-            : <span style={{ color: "#999" }}>— not generated yet —</span>}
-          {editable && (
-            <button disabled={!!busy} onClick={() => post("segments", { op: "rejectAudio", id: s.id })}>Re-record</button>
-          )}
-        </div>
-      ))}
-
-      {/* Gate 5: assemble */}
-      {viewing === "assemble" && (
-        <p style={{ color: "#666" }}>
-          {m.timeline
-            ? `Timeline ready: ${m.segments.length} segments, ${m.timeline.totalDurationSec.toFixed(1)}s @ ${m.timeline.fps}fps.`
-            : "Run assemble to derive the timeline, then Render video."}
-        </p>
-      )}
     </main>
   );
 }

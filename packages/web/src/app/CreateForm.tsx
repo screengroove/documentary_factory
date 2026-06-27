@@ -3,7 +3,9 @@ import { useState } from "react";
 
 export function CreateForm() {
   const [topic, setTopic] = useState("");
+  const [busy, setBusy] = useState(false);
   const submit = async () => {
+    setBusy(true);
     const brief = {
       topic, targetMinutes: 6, tone: "wistful, archival",
       aspectRatio: "16:9", imageStyle: "1970s 35mm film, muted",
@@ -15,9 +17,13 @@ export function CreateForm() {
     window.location.href = `/p/${slug}`;
   };
   return (
-    <div style={{ marginTop: 16 }}>
-      <input placeholder="Documentary topic" value={topic} onChange={(e) => setTopic(e.target.value)} />
-      <button onClick={submit} disabled={!topic}>Create</button>
+    <div className="ds-card" style={{ padding: 18, display: "flex", gap: 12, alignItems: "center" }}>
+      <input className="input" placeholder="Documentary topic — e.g. The history of lighthouses"
+        value={topic} onChange={(e) => setTopic(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && topic && !busy) submit(); }} />
+      <button className="btn btn--primary" onClick={submit} disabled={!topic || busy}>
+        {busy ? "Creating…" : "Create"}
+      </button>
     </div>
   );
 }
