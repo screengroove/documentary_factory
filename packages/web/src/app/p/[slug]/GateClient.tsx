@@ -246,38 +246,51 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
             {m.segments.map((s) => (
               <div key={s.id} className="ds-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
                 <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)" }}>{s.id}</span>
-                {editable
-                  ? <input className="input" defaultValue={s.shot?.imagePrompt ?? ""}
-                      onBlur={(e) => post("segments", { op: "editPrompt", id: s.id, prompt: e.target.value })} />
-                  : <p style={{ margin: 0, color: s.shot ? "var(--text-body)" : "var(--text-disabled)" }}>
-                      {s.shot?.imagePrompt ?? "— not generated yet —"}</p>}
+                {(s.stills ?? []).length === 0
+                  ? <p style={{ margin: 0, color: "var(--text-disabled)" }}>— not generated yet —</p>
+                  : (s.stills ?? []).map((st, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span className="mono" style={{ fontSize: 10, color: "var(--text-meta)", flex: "none", width: 32 }}>#{i + 1}</span>
+                        {editable
+                          ? <input className="input" style={{ flex: 1 }} defaultValue={st.imagePrompt}
+                              onBlur={(e) => post("segments", { op: "editPrompt", id: s.id, stillIndex: i, prompt: e.target.value })} />
+                          : <p style={{ margin: 0, flex: 1, color: "var(--text-body)" }}>{st.imagePrompt}</p>}
+                      </div>
+                    ))}
               </div>
             ))}
           </div>
         )}
 
-        {/* Gate 3: images */}
+        {/* Gate 3: images — one labeled row of still figures per segment */}
         {viewing === "images" && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {m.segments.map((s) => (
-              <figure key={s.id} className="ds-card" style={{ margin: 0, padding: 10, overflow: "hidden" }}>
-                {s.image
-                  ? <img src={`/api/assets/${slug}/images/${s.id}.png`} alt={s.id}
-                      style={{ width: "100%", borderRadius: "var(--radius-sm)", display: "block",
-                        border: "1px solid var(--border-hairline)" }} />
-                  : <div style={{ width: "100%", aspectRatio: "16/9", borderRadius: "var(--radius-sm)",
-                      background: "var(--surface-code)", border: "1px solid var(--border-hairline)", display: "grid",
-                      placeItems: "center", color: "var(--text-disabled)", fontSize: 12 }}>not generated</div>}
-                <figcaption style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
-                  marginTop: 8 }}>
-                  <span className="mono" style={{ fontSize: 11, color: "var(--text-meta)" }}>{s.id}</span>
-                  {editable && (
-                    <button className="btn btn--secondary btn--sm" disabled={!!busy}
-                      onClick={() => post("segments", { op: "rejectImage", id: s.id, seed: s.image?.seed ? s.image.seed + 1 : 1 })}>
-                      ⟳ Regenerate</button>
-                  )}
-                </figcaption>
-              </figure>
+              <div key={s.id} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)" }}>{s.id}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
+                  {(s.stills ?? []).map((st, i) => (
+                    <figure key={i} className="ds-card" style={{ margin: 0, padding: 10, overflow: "hidden" }}>
+                      {st.image
+                        ? <img src={`/api/assets/${slug}/images/${s.id}-${i}.png`} alt={`${s.id} #${i + 1}`}
+                            style={{ width: "100%", borderRadius: "var(--radius-sm)", display: "block",
+                              border: "1px solid var(--border-hairline)" }} />
+                        : <div style={{ width: "100%", aspectRatio: "16/9", borderRadius: "var(--radius-sm)",
+                            background: "var(--surface-code)", border: "1px solid var(--border-hairline)", display: "grid",
+                            placeItems: "center", color: "var(--text-disabled)", fontSize: 12 }}>not generated</div>}
+                      <figcaption style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                        marginTop: 8 }}>
+                        <span className="mono" style={{ fontSize: 11, color: "var(--text-meta)" }}>#{i + 1}</span>
+                        {editable && (
+                          <button className="btn btn--secondary btn--sm" disabled={!!busy}
+                            onClick={() => post("segments", { op: "rejectImage", id: s.id, stillIndex: i, seed: st.image?.seed ? st.image.seed + 1 : 1 })}>
+                            ⟳ Regenerate</button>
+                        )}
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}

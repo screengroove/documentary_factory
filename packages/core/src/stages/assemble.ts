@@ -8,26 +8,47 @@ export type DocumentaryProps = {
   aspectRatio: "16:9" | "9:16";
   segments: Array<{
     id: string;
-    imagePath: string;
-    durationInFrames: number;
-    kenBurns: { from: Rect; to: Rect };
+    durationInFrames: number; // segment total = sum of its stills
     words: Word[];
+    stills: Array<{
+      imagePath: string;
+      durationInFrames: number;
+      kenBurns: { from: Rect; to: Rect };
+    }>;
   }>;
 };
+
+// Distribute a segment's total frame budget across its stills proportional to
+// weight. The last still absorbs the rounding remainder so the per-still frames
+// sum to exactly `total` and the visual track never drifts off the audio.
+function distributeFrames(weights: number[], total: number): number[] {
+  const sum = weights.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  return weights.map((w, i) => {
+    if (i === weights.length - 1) return total - acc;
+    const f = Math.max(1, Math.round((total * w) / sum));
+    acc += f;
+    return f;
+  });
+}
 
 export function buildInputProps(m: Manifest): DocumentaryProps {
   return {
     fps: FPS,
     aspectRatio: m.brief.aspectRatio,
     segments: m.segments.map((s) => {
-      if (!s.image || !s.audio || !s.shot)
+      if (!s.stills?.length || !s.audio)
         throw new Error(`Segment ${s.id} not ready for assembly`);
+      const total = Math.max(1, Math.round(s.audio.durationSec * FPS));
+      const frames = distributeFrames(s.stills.map((st) => st.weight), total);
       return {
         id: s.id,
-        imagePath: s.image.path,
-        durationInFrames: Math.max(1, Math.round(s.audio.durationSec * FPS)),
-        kenBurns: s.shot.kenBurns,
+        durationInFrames: total,
         words: s.audio.words,
+        stills: s.stills.map((st, i) => {
+          if (!st.image) throw new Error(`Segment ${s.id} still ${i} has no image`);
+          return { imagePath: st.image.path, durationInFrames: frames[i], kenBurns: st.kenBurns };
+        }),
       };
     }),
   };

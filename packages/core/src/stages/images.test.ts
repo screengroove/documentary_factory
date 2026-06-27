@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createProject } from "../project.js";
 import { loadManifest, saveManifest } from "../manifest.js";
-import { runImages } from "./images.js";
+import { runImages, deterministicSeed } from "./images.js";
 import { makeFakeDeps } from "./deps.js";
 
 const dirs: string[] = [];
@@ -17,8 +17,8 @@ function projectWithShots() {
   const m = loadManifest(dir);
   const kb = { from: { x: 0, y: 0, w: 1, h: 1 }, to: { x: 0, y: 0, w: 1, h: 1 } };
   m.segments = [
-    { id: "seg-001", order: 0, narration: "A", shot: { imagePrompt: "p1", kenBurns: kb } },
-    { id: "seg-002", order: 1, narration: "B", shot: { imagePrompt: "p2", kenBurns: kb } },
+    { id: "seg-001", order: 0, narration: "A", stills: [{ imagePrompt: "p1", kenBurns: kb, weight: 1 }] },
+    { id: "seg-002", order: 1, narration: "B", stills: [{ imagePrompt: "p2", kenBurns: kb, weight: 1 }] },
   ];
   m.stages.script.status = "approved";
   m.stages.shotlist.status = "approved";
@@ -30,7 +30,7 @@ afterEach(() => { for (const d of dirs) rmSync(d, { recursive: true, force: true
 const fakeFetch = (async () =>
   new Response(new Uint8Array([1, 2, 3]))) as unknown as typeof fetch;
 
-test("generates and downloads an image per segment", async () => {
+test("generates and downloads an image per still", async () => {
   const dir = projectWithShots();
   const deps = makeFakeDeps({
     images: { generate: async () => ({ url: "http://fake/i.png", provider: "fake" }) },
@@ -39,17 +39,43 @@ test("generates and downloads an image per segment", async () => {
   await runImages(dir, deps, { fetchFn: fakeFetch });
 
   const m = loadManifest(dir);
-  expect(m.segments[0].image?.path).toBe("assets/images/seg-001.png");
-  expect(m.segments[0].image?.approved).toBe(false);
-  expect(existsSync(join(dir, "assets/images/seg-001.png"))).toBe(true);
+  expect(m.segments[0].stills?.[0].image?.path).toBe("assets/images/seg-001-0.png");
+  expect(m.segments[0].stills?.[0].image?.approved).toBe(false);
+  expect(existsSync(join(dir, "assets/images/seg-001-0.png"))).toBe(true);
   expect(m.stages.images.status).toBe("awaiting_review");
 });
 
-test("skips segments whose image is already approved", async () => {
+test("folds the still index into the seed so stills differ", async () => {
   const dir = projectWithShots();
-  // Pre-approve seg-001
+  // Give seg-001 two stills with no images; each should get its own seed.
   let m = loadManifest(dir);
-  m.segments[0].image = { path: "assets/images/seg-001.png", seed: 1, provider: "x", approved: true };
+  const kb = { from: { x: 0, y: 0, w: 1, h: 1 }, to: { x: 0, y: 0, w: 1, h: 1 } };
+  m.segments[0].stills = [
+    { imagePrompt: "p1", kenBurns: kb, weight: 1 },
+    { imagePrompt: "p2", kenBurns: kb, weight: 1 },
+  ];
+  saveManifest(dir, m);
+
+  const deps = makeFakeDeps({
+    images: { generate: async () => ({ url: "http://fake/i.png", provider: "fake" }) },
+  });
+  await runImages(dir, deps, { fetchFn: fakeFetch });
+
+  m = loadManifest(dir);
+  const s0 = m.segments[0].stills?.[0].image?.seed;
+  const s1 = m.segments[0].stills?.[1].image?.seed;
+  expect(s0).toBe(deterministicSeed("seg-001:0"));
+  expect(s1).toBe(deterministicSeed("seg-001:1"));
+  expect(s0).not.toBe(s1);
+});
+
+test("skips stills already approved", async () => {
+  const dir = projectWithShots();
+  // Pre-approve seg-001's only still.
+  let m = loadManifest(dir);
+  m.segments[0].stills![0].image = {
+    path: "assets/images/seg-001-0.png", seed: 1, provider: "x", approved: true,
+  };
   saveManifest(dir, m);
 
   let calls = 0;
@@ -57,5 +83,30 @@ test("skips segments whose image is already approved", async () => {
     images: { generate: async () => { calls++; return { url: "http://fake/i.png", provider: "fake" }; } },
   });
   await runImages(dir, deps, { fetchFn: fakeFetch });
-  expect(calls).toBe(1); // only seg-002 regenerated
+  expect(calls).toBe(1); // only seg-002's still regenerated
+});
+
+test("regenerates only stills flagged needsRegen", async () => {
+  const dir = projectWithShots();
+  let m = loadManifest(dir);
+  // seg-001 done & not flagged; seg-002 done but flagged for regen.
+  m.segments[0].stills![0].image = {
+    path: "assets/images/seg-001-0.png", seed: 1, provider: "x", approved: true,
+  };
+  m.segments[1].stills![0].image = {
+    path: "assets/images/seg-002-0.png", seed: 2, provider: "x", approved: false, needsRegen: true,
+  };
+  saveManifest(dir, m);
+
+  let calls = 0;
+  const deps = makeFakeDeps({
+    images: { generate: async () => { calls++; return { url: "http://fake/i.png", provider: "fake" }; } },
+  });
+  await runImages(dir, deps, { fetchFn: fakeFetch });
+  expect(calls).toBe(1); // only the needsRegen still
+
+  m = loadManifest(dir);
+  // Regenerated still keeps its original seed and is reset to unapproved.
+  expect(m.segments[1].stills?.[0].image?.seed).toBe(2);
+  expect(m.segments[1].stills?.[0].image?.approved).toBe(false);
 });

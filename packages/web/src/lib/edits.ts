@@ -1,4 +1,4 @@
-import { loadManifest, saveManifest, type StageName } from "@doc/core";
+import { loadManifest, saveManifest, type StageName, type Still } from "@doc/core";
 
 export function approveStage(dir: string, stage: StageName): void {
   const m = loadManifest(dir);
@@ -10,7 +10,8 @@ export function approveStage(dir: string, stage: StageName): void {
       `Cannot approve ${stage}: status is "${m.stages[stage].status}", expected "awaiting_review". Run the stage first.`,
     );
   if (stage === "images")
-    for (const s of m.segments) if (s.image) { s.image.approved = true; delete s.image.needsRegen; }
+    for (const s of m.segments) for (const still of s.stills ?? [])
+      if (still.image) { still.image.approved = true; delete still.image.needsRegen; }
   m.stages[stage].status = "approved";
   m.stages[stage].completedAt = new Date().toISOString();
   saveManifest(dir, m);
@@ -30,23 +31,32 @@ export function editNarration(dir: string, id: string, text: string): void {
   saveManifest(dir, m);
 }
 
-export function editPrompt(dir: string, id: string, prompt: string): void {
+// Resolve the still at `stillIndex`, throwing a clear error if the segment has
+// no stills or the index is out of range.
+function still(s: { id: string; stills?: Still[] }, stillIndex: number): Still {
+  if (!s.stills || s.stills.length === 0) throw new Error(`Segment ${s.id} has no stills`);
+  const st = s.stills[stillIndex];
+  if (!st) throw new Error(`Segment ${s.id} has no still at index ${stillIndex}`);
+  return st;
+}
+
+export function editPrompt(dir: string, id: string, stillIndex: number, prompt: string): void {
   const { m, s } = seg(dir, id);
   if (m.stages.shotlist.status === "approved") throw new Error("Shotlist already approved");
-  if (!s.shot) throw new Error(`Segment ${id} has no shot`);
-  s.shot.imagePrompt = prompt;
+  still(s, stillIndex).imagePrompt = prompt;
   saveManifest(dir, m);
 }
 
-export function rejectImage(dir: string, id: string, opts: { seed?: number; prompt?: string } = {}): void {
+export function rejectImage(dir: string, id: string, stillIndex: number, opts: { seed?: number; prompt?: string } = {}): void {
   const { m, s } = seg(dir, id);
-  if (!s.image) throw new Error(`Segment ${id} has no image`);
-  s.image.needsRegen = true;
-  s.image.approved = false;
+  const st = still(s, stillIndex);
+  if (!st.image) throw new Error(`Segment ${id} still ${stillIndex} has no image`);
+  st.image.needsRegen = true;
+  st.image.approved = false;
   // Bump the seed so the regen produces a DIFFERENT image (deterministicSeed
   // would otherwise reproduce the same one); caller may override.
-  s.image.seed = opts.seed ?? s.image.seed + 1;
-  if (opts.prompt !== undefined && s.shot) s.shot.imagePrompt = opts.prompt;
+  st.image.seed = opts.seed ?? st.image.seed + 1;
+  if (opts.prompt !== undefined) st.imagePrompt = opts.prompt;
   saveManifest(dir, m);
 }
 

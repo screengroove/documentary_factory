@@ -27,24 +27,30 @@ export async function runImages(
   saveManifest(projectDir, m);
 
   for (const seg of m.segments) {
-    // Skip approved images AND freshly-generated ones awaiting review; only
-    // (re)generate when the image is missing or explicitly flagged by rejectImage.
-    if (seg.image && !seg.image.needsRegen) continue;
-    if (!seg.shot) throw new Error(`Segment ${seg.id} has no shot; run shotlist first`);
+    if (!seg.stills) throw new Error(`Segment ${seg.id} has no stills; run shotlist first`);
 
-    const seed = seg.image?.seed ?? deterministicSeed(seg.id);
-    const { url, provider } = await deps.images.generate({
-      prompt: seg.shot.imagePrompt, seed, width, height,
-    });
+    // One image per still. The still index folds into both the seed and the
+    // filename so different stills in a segment get different images.
+    for (let i = 0; i < seg.stills.length; i++) {
+      const still = seg.stills[i];
+      // Skip approved images AND freshly-generated ones awaiting review; only
+      // (re)generate when the image is missing or explicitly flagged by rejectImage.
+      if (still.image && !still.image.needsRegen) continue;
 
-    const res = await fetchFn(url);
-    if (!res.ok) throw new Error(`Image download failed for ${seg.id}: ${res.status}`);
-    const bytes = Buffer.from(await res.arrayBuffer());
-    const rel = `assets/images/${seg.id}.png`;
-    writeFileSync(join(projectPaths(projectDir).images, `${seg.id}.png`), bytes);
+      const seed = still.image?.seed ?? deterministicSeed(`${seg.id}:${i}`);
+      const { url, provider } = await deps.images.generate({
+        prompt: still.imagePrompt, seed, width, height,
+      });
 
-    seg.image = { path: rel, seed, provider, approved: false };
-    saveManifest(projectDir, m); // persist per-segment
+      const res = await fetchFn(url);
+      if (!res.ok) throw new Error(`Image download failed for ${seg.id}-${i}: ${res.status}`);
+      const bytes = Buffer.from(await res.arrayBuffer());
+      const rel = `assets/images/${seg.id}-${i}.png`;
+      writeFileSync(join(projectPaths(projectDir).images, `${seg.id}-${i}.png`), bytes);
+
+      still.image = { path: rel, seed, provider, approved: false };
+      saveManifest(projectDir, m); // persist per-still
+    }
   }
 
   m.stages.images.status = "awaiting_review";

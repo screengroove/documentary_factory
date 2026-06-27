@@ -40,7 +40,7 @@ test("rejects an unknown stage status", () => {
   expect(() => ManifestSchema.parse(bad)).toThrow();
 });
 
-test("accepts a fully-populated segment", () => {
+test("accepts a fully-populated segment with multiple stills", () => {
   const full = {
     ...minimal,
     segments: [
@@ -48,19 +48,30 @@ test("accepts a fully-populated segment", () => {
         id: "seg-001",
         order: 0,
         narration: "Long before satellites...",
-        shot: {
-          imagePrompt: "a stone lighthouse at dusk, 1970s 35mm film",
-          kenBurns: {
-            from: { x: 0, y: 0, w: 1, h: 1 },
-            to: { x: 0.1, y: 0.1, w: 0.8, h: 0.8 },
+        stills: [
+          {
+            imagePrompt: "a stone lighthouse at dusk, 1970s 35mm film",
+            kenBurns: {
+              from: { x: 0, y: 0, w: 1, h: 1 },
+              to: { x: 0.1, y: 0.1, w: 0.8, h: 0.8 },
+            },
+            weight: 2,
+            image: {
+              path: "assets/images/seg-001-0.png",
+              seed: 42,
+              provider: "replicate:flux-1.1-pro",
+              approved: true,
+            },
           },
-        },
-        image: {
-          path: "assets/images/seg-001.png",
-          seed: 42,
-          provider: "replicate:flux-1.1-pro",
-          approved: true,
-        },
+          {
+            imagePrompt: "the beam sweeping across black water, 1970s 35mm film",
+            kenBurns: {
+              from: { x: 0.1, y: 0.1, w: 0.8, h: 0.8 },
+              to: { x: 0, y: 0, w: 1, h: 1 },
+            },
+            weight: 1,
+          },
+        ],
         audio: {
           path: "assets/audio/seg-001.wav",
           durationSec: 4.2,
@@ -69,5 +80,29 @@ test("accepts a fully-populated segment", () => {
       },
     ],
   };
-  expect(ManifestSchema.parse(full).segments[0].image?.seed).toBe(42);
+  const parsed = ManifestSchema.parse(full);
+  expect(parsed.segments[0].stills?.[0].image?.seed).toBe(42);
+  expect(parsed.segments[0].stills?.[0].weight).toBe(2);
+  expect(parsed.segments[0].stills?.[1].image).toBeUndefined();
+});
+
+test("rejects a non-positive still weight", () => {
+  const bad = {
+    ...minimal,
+    segments: [
+      {
+        id: "seg-001",
+        order: 0,
+        narration: "n",
+        stills: [
+          {
+            imagePrompt: "x",
+            kenBurns: { from: { x: 0, y: 0, w: 1, h: 1 }, to: { x: 0, y: 0, w: 1, h: 1 } },
+            weight: 0,
+          },
+        ],
+      },
+    ],
+  };
+  expect(() => ManifestSchema.parse(bad)).toThrow();
 });
