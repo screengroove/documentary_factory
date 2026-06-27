@@ -157,3 +157,16 @@ test("buildInputProps omits music when none is chosen", () => {
   const dir = projectWith([{ durationSec: 2, weights: [1] }]);
   expect(buildInputProps(loadManifest(dir)).music).toBeUndefined();
 });
+
+test("runAssemble creates assets/music dir if absent (pre-existing projects)", async () => {
+  const dir = projectWith([{ durationSec: 2, weights: [1] }]);
+  // Simulate a pre-existing project that predates the music dir
+  rmSync(join(dir, "assets/music"), { recursive: true, force: true });
+  const pre = loadManifest(dir); pre.brief.tone = "tense, urgent"; saveManifest(dir, pre);
+
+  await expect(runAssemble(dir)).resolves.toBeUndefined();
+
+  const m = loadManifest(dir);
+  expect(m.music?.trackId).toBe("schellekens-medieval");
+  expect(existsSync(join(dir, "assets/music/schellekens-medieval.mp3"))).toBe(true);
+});

@@ -1,4 +1,4 @@
-import { copyFileSync } from "node:fs";
+import { copyFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { loadManifest, saveManifest, type Manifest, type Rect } from "../manifest.js";
 import type { Word } from "../providers/types.js";
@@ -96,6 +96,7 @@ export async function runAssemble(
   // Auto-pick a soundtrack on first assemble; respect an existing/overridden choice.
   if (!m.music && CATALOG.length > 0) {
     const track = pickTrack(m.brief.tone);
+    mkdirSync(projectPaths(projectDir).music, { recursive: true }); // older projects may predate the dir
     copyFileSync(trackSourcePath(track, opts.musicLibDir), join(projectPaths(projectDir).music, track.file));
     m.music = { trackId: track.id, path: `assets/music/${track.file}`, volume: DEFAULT_MUSIC_VOLUME };
   }
