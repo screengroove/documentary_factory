@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Manifest, StageName } from "@doc/core";
 
 const ORDER: StageName[] = ["script", "shotlist", "images", "voiceover", "assemble"];
@@ -28,6 +28,18 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
   const [viewing, setViewing] = useState<StageName>(activeStage(initial));
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // The rendered MP4 lives at <slug>/out/<slug>.mp4, served by /video. It's not
+  // tracked in the manifest, so probe the route to know whether a video exists
+  // (also covers reloads where a prior render is still on the volume).
+  const [videoReady, setVideoReady] = useState(false);
+  // Bumped after each render to bust the browser cache of the <video>/download.
+  const [videoVersion, setVideoVersion] = useState(0);
+
+  const checkVideo = async () => {
+    const res = await fetch(`/api/projects/${slug}/video`, { method: "HEAD" }).catch(() => null);
+    setVideoReady(!!res?.ok);
+  };
+  useEffect(() => { void checkVideo(); }, [slug]);
 
   const active = activeStage(m);
   const editable = viewing === active;
@@ -77,6 +89,12 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
   const approve = async () => {
     const man = await post("approve", { stage: active });
     setViewing(activeStage(man));
+  };
+
+  const renderVideo = async () => {
+    await longPost("render", {}, "Rendering video");
+    setVideoVersion((v) => v + 1);
+    await checkVideo();
   };
 
   const viewingStatus = m.stages[viewing].status;
@@ -196,7 +214,7 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
             <button className="btn btn--secondary" disabled={!!busy} onClick={approve}>Approve “{active}”</button>
             {active === "assemble" && m.stages.voiceover.status === "approved" && (
               <button className="btn btn--primary" disabled={!!busy}
-                onClick={() => longPost("render", {}, "Rendering video")}>Render video</button>
+                onClick={renderVideo}>{videoReady ? "Re-render video" : "Render video"}</button>
             )}
           </div>
         ) : (
@@ -286,11 +304,25 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
 
         {/* Gate 5: assemble */}
         {viewing === "assemble" && (
-          <div className="ds-card" style={{ padding: 20, color: "var(--text-body)" }}>
-            {m.timeline
-              ? <span className="mono" style={{ color: "var(--color-cyan)", fontSize: 13 }}>
-                  timeline · {m.segments.length} segments · {m.timeline.totalDurationSec.toFixed(1)}s @ {m.timeline.fps}fps</span>
-              : "Run assemble to derive the timeline, then Render video."}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="ds-card" style={{ padding: 20, color: "var(--text-body)" }}>
+              {m.timeline
+                ? <span className="mono" style={{ color: "var(--color-cyan)", fontSize: 13 }}>
+                    timeline · {m.segments.length} segments · {m.timeline.totalDurationSec.toFixed(1)}s @ {m.timeline.fps}fps</span>
+                : "Run assemble to derive the timeline, then Render video."}
+            </div>
+            {videoReady && (
+              <div className="ds-card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-heading)" }}>Final video</span>
+                  <a className="btn btn--primary btn--sm" href={`/api/projects/${slug}/video?v=${videoVersion}`}
+                    download={`${slug}.mp4`}>↓ Download MP4</a>
+                </div>
+                <video controls src={`/api/projects/${slug}/video?v=${videoVersion}`}
+                  style={{ width: "100%", borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--border-hairline)", display: "block", background: "#000" }} />
+              </div>
+            )}
           </div>
         )}
 
