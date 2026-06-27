@@ -1,0 +1,11 @@
+node_modules
+**/node_modules
+.next
+**/.next
+projects
+.git
+.vercel
+.DS_Store
+*.tsbuildinfo
+npm-debug.log
+docs

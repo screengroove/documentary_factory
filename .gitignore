@@ -1,8 +1,11 @@
 node_modules/
 dist/
 .env
-projects/*/assets/
-projects/*/out/
-projects/*/runs/
+# /projects/ holds runtime-generated documentaries (manifests + assets) — user data, not source.
+# Anchored to repo root so it doesn't match source dirs like src/app/api/projects/.
+/projects/
 .next/
+next-env.d.ts
+*.tsbuildinfo
 .DS_Store
+.vercel
