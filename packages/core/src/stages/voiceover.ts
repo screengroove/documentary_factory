@@ -5,7 +5,10 @@ import { loadManifest, saveManifest } from "../manifest.js";
 import { projectPaths } from "../project.js";
 import type { StageDeps } from "./deps.js";
 
-export const DEFAULT_VOICE_ID = "af_sarah"; // Kokoro voice; "bf_emma" / "am_michael" also suit narration
+// Kokoro voice. bm_george is a deep, measured British male — the closest fit to a
+// distinguished nature-documentary narrator. Other British males: bm_lewis,
+// bm_daniel, bm_fable. (This is voice character, not an impersonation of any person.)
+export const DEFAULT_VOICE_ID = "bm_george";
 
 // Measure the real audio length so the Sequence covers trailing silence, not just
 // the last spoken word (remotion-best-practices: get-audio-duration). Injectable for tests.
