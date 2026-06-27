@@ -23,7 +23,9 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`badge ${meta.mod}`}><span className="dot" />{meta.label}</span>;
 }
 
-export function GateClient({ slug, initial }: { slug: string; initial: Manifest }) {
+export function GateClient({ slug, initial, tracks }: {
+  slug: string; initial: Manifest; tracks: Array<{ id: string; title: string; composer: string }>;
+}) {
   const [m, setM] = useState(initial);
   const [viewing, setViewing] = useState<StageName>(activeStage(initial));
   const [actionError, setActionError] = useState<string | null>(null);
@@ -360,6 +362,24 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
         {/* Gate 5: assemble */}
         {viewing === "assemble" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {m.music && (
+              <div className="ds-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
+                <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)" }}>Soundtrack</span>
+                <audio controls src={`/api/assets/${slug}/music/${m.music.path.split("/").pop()}`} style={{ width: "100%", height: 34 }} />
+                {editable && (
+                  <select
+                    className="input"
+                    value={m.music.trackId}
+                    disabled={!!busy}
+                    onChange={(e) => post("segments", { op: "setMusicTrack", trackId: e.target.value })}
+                  >
+                    {tracks.map((t) => (
+                      <option key={t.id} value={t.id}>{t.title} — {t.composer}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
             <div className="ds-card" style={{ padding: 20, color: "var(--text-body)" }}>
               {m.timeline
                 ? <span className="mono" style={{ color: "var(--color-cyan)", fontSize: 13 }}>
