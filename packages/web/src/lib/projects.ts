@@ -12,6 +12,9 @@ export function listProjects(): Array<{ slug: string; status: Record<StageName, 
   if (!existsSync(PROJECTS_ROOT)) return [];
   return readdirSync(PROJECTS_ROOT, { withFileTypes: true })
     .filter((d) => d.isDirectory())
+    // A project dir always has a manifest.json. Skip non-project dirs such as
+    // the volume's lost+found (ext4) or any stray directory.
+    .filter((d) => existsSync(join(PROJECTS_ROOT, d.name, "manifest.json")))
     .map((d) => {
       const m = loadManifest(join(PROJECTS_ROOT, d.name));
       const status = Object.fromEntries(
