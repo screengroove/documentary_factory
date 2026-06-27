@@ -23,3 +23,12 @@ test("creates project dir, subdirs, and initial manifest", () => {
   expect(man.stages.script.status).toBe("pending");
   expect(man.segments).toEqual([]);
 });
+
+test("createProject creates the music asset dir", () => {
+  const root = mkdtempSync(join(tmpdir(), "root-"));
+  const dir = createProject(root, "doc", {
+    topic: "t", targetMinutes: 6, tone: "calm", aspectRatio: "16:9", imageStyle: "film",
+  }, "2026-06-26T00:00:00.000Z");
+  expect(existsSync(join(dir, "assets/music"))).toBe(true);
+  rmSync(root, { recursive: true, force: true });
+});

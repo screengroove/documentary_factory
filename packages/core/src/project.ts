@@ -8,6 +8,7 @@ export function projectPaths(projectDir: string) {
   return {
     images: join(projectDir, "assets/images"),
     audio: join(projectDir, "assets/audio"),
+    music: join(projectDir, "assets/music"),
     out: join(projectDir, "out"),
     runs: join(projectDir, "runs"),
   };
@@ -16,7 +17,7 @@ export function projectPaths(projectDir: string) {
 export function createProject(rootDir: string, slug: string, brief: Brief, now: string): string {
   const dir = join(rootDir, slug);
   const p = projectPaths(dir);
-  for (const d of [p.images, p.audio, p.out, p.runs]) mkdirSync(d, { recursive: true });
+  for (const d of [p.images, p.audio, p.music, p.out, p.runs]) mkdirSync(d, { recursive: true });
 
   const stages = Object.fromEntries(
     STAGE_NAMES.map((n) => [n, { status: "pending" as const }]),
