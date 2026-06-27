@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export type Track = {
@@ -36,9 +36,11 @@ export const CATALOG: Track[] = [
 
 // Absolute path to the in-repo library. Resolves correctly under vitest (real
 // ESM source). In the bundled Next server this is wrong — callers there MUST
-// pass an explicit libDir (see plan Global Constraints).
+// pass an explicit libDir (see plan Global Constraints). Computed via path.join
+// rather than `new URL("...", import.meta.url)`: webpack treats that literal as
+// a bundled asset and fails the Next build trying to resolve the directory.
 export function musicLibraryDir(): string {
-  return fileURLToPath(new URL("../../assets/music/", import.meta.url));
+  return join(dirname(fileURLToPath(import.meta.url)), "../../assets/music");
 }
 
 export function trackSourcePath(track: Track, libDir: string = musicLibraryDir()): string {
