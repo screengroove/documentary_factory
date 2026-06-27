@@ -59,11 +59,11 @@ With storage on Supabase, the light stages (`script`/`images`/`voiceover`) *coul
 
 **Final (2026-06-27):** Deployed the **entire** app as one Railway service (project `documentary-factory`, service `web`) with a **5 GB persistent volume mounted at `/app/projects`**. No Supabase. Live at **https://web-production-aaa1d.up.railway.app**. Build = repo-root `Dockerfile` (Node 22 bookworm-slim + Remotion's Chromium system libs, full-monorepo `npm install`, Chromium pre-pulled at build, starts `next start` with cwd `packages/web`). Secrets `ANTHROPIC_API_KEY` / `REPLICATE_API_TOKEN` set as Railway service variables; `PORT=3000` pinned.
 
-End-to-end verified in production: create + all five stages + a 1695-frame Remotion render (56s video) completed; assets and MP4 written to the volume.
+End-to-end verified in production: create + all five stages + a 1695-frame Remotion render completed, and the finished MP4 was **downloaded from the deployed app and confirmed valid via ffprobe** — h264 video (56.5s) + aac audio (56.55s), 28.9 MB. Both streams present (not a silent render).
 
-Two notes from the deploy:
-- **Bug fixed:** the ext4 volume contains a `lost+found` dir; `listProjects()` treated it as a project and 500'd the homepage. Fixed to only count dirs containing `manifest.json` (`packages/web/src/lib/projects.ts`).
-- **Known gap (not deployment-related):** the app has **no route to download/serve the finished MP4** (it lives at `<slug>/out/<slug>.mp4`, outside the `/api/assets` `assets/` path). To retrieve a rendered video from the UI, a small download route is still needed.
+Two fixes landed during the deploy:
+- **`lost+found` bug:** the ext4 volume contains a `lost+found` dir; `listProjects()` treated it as a project and 500'd the homepage. Fixed to only count dirs containing `manifest.json` (`packages/web/src/lib/projects.ts`).
+- **MP4 download route added:** the render lands at `<slug>/out/<slug>.mp4`, outside the `/api/assets` `assets/` path, so there was no way to retrieve it. Added `GET /api/projects/[slug]/video` (`packages/web/src/app/api/projects/[slug]/video/route.ts`). Note: the UI does not yet link to this route — wiring a "Download/Play" button into `GateClient.tsx` after render is a small remaining UX nicety.
 
 ---
 
