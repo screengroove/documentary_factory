@@ -8,3 +8,4 @@ export * from "./stages/shotlist.js";
 export * from "./stages/images.js";
 export * from "./stages/voiceover.js";
 export * from "./stages/assemble.js";
+export * from "./music/catalog.js";
