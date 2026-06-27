@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "studio": "remotion studio src/Root.tsx",
-    "render": "remotion render src/Root.tsx Documentary out.mp4"
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Documentary out.mp4"
   },
   "dependencies": {
     "@doc/core": "*",

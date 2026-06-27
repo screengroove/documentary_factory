@@ -15,18 +15,27 @@ export async function POST(_req: Request, { params }: { params: Promise<{ slug: 
     const propsPath = join(dir, "out", "inputProps.json");
     writeFileSync(propsPath, JSON.stringify({ props }));
     const outPath = join(dir, "out", `${slug}.mp4`);
-    // publicDir points at the project dir so staticFile() resolves assets/*.
+    // Run from the render package so its remotion.config.ts loads (it sets the
+    // webpack extensionAlias that resolves the ".js" import specifiers). Entry
+    // is index.ts (the file that calls registerRoot), not Root.tsx. publicDir
+    // points at the project dir so staticFile() resolves assets/*.
+    const renderDir = join(process.cwd(), "..", "render");
     execFileSync("npx", [
       "remotion", "render",
-      join(process.cwd(), "..", "render", "src", "Root.tsx"),
+      "src/index.ts",
       "Documentary", outPath,
       "--props", propsPath,
       "--public-dir", dir,
-    ], { stdio: "inherit" });
+    ], { cwd: renderDir, stdio: ["ignore", "inherit", "pipe"] });
     return NextResponse.json({ ok: true, out: `out/${slug}.mp4` });
   } catch (err) {
+    // execFileSync surfaces the subprocess stderr on err.stderr — include its tail
+    // so a failed render reports the real Remotion error, not just the command.
+    const stderr = (err as { stderr?: Buffer | string }).stderr;
+    const detail = stderr ? String(stderr).trim().split("\n").slice(-12).join("\n") : "";
+    const base = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : String(err) },
+      { ok: false, error: detail ? `${base}\n\n${detail}` : base },
       { status: 500 },
     );
   }
