@@ -141,3 +141,19 @@ test("runAssemble respects an already-chosen track", async () => {
   expect(loadManifest(dir).music?.trackId).toBe("mamoun-statement-1");
   expect(loadManifest(dir).music?.volume).toBe(0.2);
 });
+
+test("buildInputProps surfaces the music block when present", () => {
+  const dir = projectWith([{ durationSec: 2, weights: [1] }]);
+  const m = loadManifest(dir);
+  m.music = { trackId: "mamoun-statement-1", path: "assets/music/mamoun-statement-1.mp3", volume: 0.15 };
+  saveManifest(dir, m);
+
+  const props = buildInputProps(loadManifest(dir));
+  expect(props.music?.path).toBe("assets/music/mamoun-statement-1.mp3");
+  expect(props.music?.volume).toBe(0.15);
+});
+
+test("buildInputProps omits music when none is chosen", () => {
+  const dir = projectWith([{ durationSec: 2, weights: [1] }]);
+  expect(buildInputProps(loadManifest(dir)).music).toBeUndefined();
+});

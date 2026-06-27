@@ -18,6 +18,7 @@ export type DocumentaryProps = {
     text: string;
     subtitle?: string;
   };
+  music?: { path: string; volume: number };
   segments: Array<{
     id: string;
     durationInFrames: number; // segment total = sum of its stills
@@ -59,10 +60,12 @@ export function buildInputProps(m: Manifest): DocumentaryProps {
         ...(t.subtitle ? { subtitle: t.subtitle } : {}),
       }
     : undefined;
+  const music = m.music ? { path: m.music.path, volume: m.music.volume } : undefined;
   return {
     fps: FPS,
     aspectRatio: m.brief.aspectRatio,
     ...(intro ? { intro } : {}),
+    ...(music ? { music } : {}),
     segments: m.segments.map((s) => {
       if (!s.stills?.length || !s.audio)
         throw new Error(`Segment ${s.id} not ready for assembly`);
