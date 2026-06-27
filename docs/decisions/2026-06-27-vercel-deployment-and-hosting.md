@@ -1,7 +1,9 @@
 # Decision Log — Vercel deployment & hosting architecture
 
-**Date:** 2026-06-27
-**Status:** UI deployed and live; "create documentary" flow NON-FUNCTIONAL on Vercel. Hosting architecture decision OPEN.
+**Date:** 2026-06-27 (updated later same day)
+**Status:** RESOLVED — entire app deployed to **Railway** with a persistent volume; full pipeline (create → script → shotlist → images → voiceover → assemble → render) verified working end-to-end in production. **Supabase NOT used** (user chose to avoid it; the Railway volume replaces the filesystem with zero storage refactor). Vercel deployment abandoned (left as-is).
+
+> See `docs/superpowers/specs/2026-06-27-railway-deployment-design.md` and `docs/superpowers/plans/2026-06-27-railway-deployment.md` for the design/plan that superseded the render-host portion below.
 **Owner:** Patrick
 
 ---
@@ -53,7 +55,19 @@ Caveat surfaced to user: **Supabase ≠ Railway in role.** Supabase solves *stor
 
 With storage on Supabase, the light stages (`script`/`images`/`voiceover`) *could* run as Vercel functions if their FS writes are swapped for Supabase Storage and they fit the timeout (Replicate polling is slow → may need background/fluid compute).
 
-## 5. Decision: render host — STILL OPEN
+## 5. Decision: render host — RESOLVED → Railway (whole app + volume)
+
+**Final (2026-06-27):** Deployed the **entire** app as one Railway service (project `documentary-factory`, service `web`) with a **5 GB persistent volume mounted at `/app/projects`**. No Supabase. Live at **https://web-production-aaa1d.up.railway.app**. Build = repo-root `Dockerfile` (Node 22 bookworm-slim + Remotion's Chromium system libs, full-monorepo `npm install`, Chromium pre-pulled at build, starts `next start` with cwd `packages/web`). Secrets `ANTHROPIC_API_KEY` / `REPLICATE_API_TOKEN` set as Railway service variables; `PORT=3000` pinned.
+
+End-to-end verified in production: create + all five stages + a 1695-frame Remotion render (56s video) completed; assets and MP4 written to the volume.
+
+Two notes from the deploy:
+- **Bug fixed:** the ext4 volume contains a `lost+found` dir; `listProjects()` treated it as a project and 500'd the homepage. Fixed to only count dirs containing `manifest.json` (`packages/web/src/lib/projects.ts`).
+- **Known gap (not deployment-related):** the app has **no route to download/serve the finished MP4** (it lives at `<slug>/out/<slug>.mp4`, outside the `/api/assets` `assets/` path). To retrieve a rendered video from the UI, a small download route is still needed.
+
+---
+
+### (historical) render host — options when STILL OPEN
 
 Options presented:
 - **Remotion Lambda (AWS)** — serverless render, pay-per-render, no always-on server; one-time AWS IAM/S3 setup. Best "stay fully cloud" fit.
@@ -70,11 +84,30 @@ Render workload = heavy (Chromium+ffmpeg, RAM-hungry, minutes/job, **bursty/occa
 
 **Recommendation given:** renders are bursty → **Fly Machines** is the better architectural/cost fit; **Railway** if "working today, minimal ops" matters more. And if it's mainly Patrick → **render locally + store to Supabase** sidesteps both (zero extra infra).
 
+**Update (later 2026-06-27):** Patrick provisioned **Railway** tooling — Railway CLI `5.23.1` installed (Homebrew), logged in as Patrick Iwanicki (patrick@joltlabs.ai), and the Railway MCP server wired into Claude Code (see §8). This signals a lean toward **Railway** as the render host (the "working today, minimal ops" path) over Fly/Lambda. Treat as a strong lean, not a locked decision — the public-vs-personal question (§6 Q2) still governs and is unconfirmed. If Railway is chosen, validate the per-plan RAM ceiling is ≥2–4 GB for Chromium+ffmpeg renders.
+
 ## 6. Open questions for next session
 
 1. **Render host decision** — Remotion Lambda vs local vs Fly vs Railway. (Leaning: local-for-now or Fly Machines; depends on usage = personal vs public app — unconfirmed.)
 2. Is the deployed app meant to be **public/multi-user** or **Patrick's personal hosted tool**? This drives 1 heavily.
 3. Scope of the **storage refactor**: abstract FS access in `@doc/core` (`project.ts`, `manifest.ts`, `stages/*`) and `packages/web/src/lib/projects.ts` behind a storage interface, then implement a Supabase backend. The light stages also need a run model on Vercel (timeouts) if not run on the render host too.
+
+## 8. Session update — later 2026-06-27 (handoff notes)
+
+Two changes landed after the original log above. Neither touches app code.
+
+**A. Branch pushed to GitHub.**
+- Branch `feat/documentary-pipeline` pushed and tracking `origin/feat/documentary-pipeline`.
+- Remote `origin` = `https://github.com/screengroove/documentary_factory.git` (already configured; no `remote add` needed).
+- **Auth gotcha for next session:** the machine's default `gh`/git credential was account **`Talentrdr`**, which is **denied** write access to the `screengroove` repo (push → HTTP 403). Resolved by `gh auth login` as account **`screengroove`** + `gh auth setup-git` + erasing the stale osxkeychain entry. If a future push 403s, re-check `gh auth status` — the active account must have write access to `screengroove/documentary_factory`.
+- Note the org/account naming: Vercel project lives under team **`ironiks`**; GitHub repo lives under **`screengroove`**. Don't conflate them.
+- To open the PR: `gh pr create --base main --head feat/documentary-pipeline`.
+
+**B. Railway tooling provisioned (toward §5 render-host decision).**
+- `@railway/mcp-server` npm package is **deprecated** — Railway MCP is now bundled into the Railway CLI (`railway mcp`). Do not re-add the npm package.
+- Installed Railway CLI `5.23.1` via Homebrew; logged in as Patrick Iwanicki (patrick@joltlabs.ai).
+- Registered MCP server in Claude Code: `claude mcp add railway -- railway mcp` → status **✔ Connected**. Scope is **local** (only this repo, `/Users/patrickiwanicki/Repos/documentary`); promote to `user` scope if you want it everywhere.
+- The MCP requires `railway login` to be active — if it shows "Failed to connect" later, run `railway whoami` and re-login.
 
 ## 7. Key references
 
