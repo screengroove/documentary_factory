@@ -126,7 +126,7 @@ test("runAssemble auto-picks a soundtrack and copies it into the project", async
   const m = loadManifest(dir);
   expect(m.music?.trackId).toBe("schellekens-medieval");
   expect(m.music?.path).toBe("assets/music/schellekens-medieval.mp3");
-  expect(m.music?.volume).toBe(0.15);
+  expect(m.music?.volume).toBe(0.1);
   expect(existsSync(join(dir, "assets/music/schellekens-medieval.mp3"))).toBe(true);
 });
 

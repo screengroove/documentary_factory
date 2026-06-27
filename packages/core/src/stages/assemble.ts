@@ -6,7 +6,7 @@ import { projectPaths } from "../project.js";
 import { CATALOG, pickTrack, trackSourcePath } from "../music/catalog.js";
 
 const FPS = 30;
-export const DEFAULT_MUSIC_VOLUME = 0.15;
+export const DEFAULT_MUSIC_VOLUME = 0.1;
 
 export type DocumentaryProps = {
   fps: number;
