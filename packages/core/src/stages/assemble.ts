@@ -6,6 +6,13 @@ const FPS = 30;
 export type DocumentaryProps = {
   fps: number;
   aspectRatio: "16:9" | "9:16";
+  intro?: {
+    imagePath: string;
+    durationInFrames: number;
+    kenBurns: { from: Rect; to: Rect };
+    text: string;
+    subtitle?: string;
+  };
   segments: Array<{
     id: string;
     durationInFrames: number; // segment total = sum of its stills
@@ -35,9 +42,22 @@ function distributeFrames(weights: number[], total: number): number[] {
 }
 
 export function buildInputProps(m: Manifest): DocumentaryProps {
+  const t = m.title;
+  // The intro plays only once its background image exists; the title text is
+  // drawn by the render, so a title without an image yields no intro.
+  const intro = t?.image
+    ? {
+        imagePath: t.image.path,
+        durationInFrames: Math.max(1, Math.round(t.durationSec * FPS)),
+        kenBurns: t.kenBurns,
+        text: t.text,
+        ...(t.subtitle ? { subtitle: t.subtitle } : {}),
+      }
+    : undefined;
   return {
     fps: FPS,
     aspectRatio: m.brief.aspectRatio,
+    ...(intro ? { intro } : {}),
     segments: m.segments.map((s) => {
       if (!s.stills?.length || !s.audio)
         throw new Error(`Segment ${s.id} not ready for assembly`);

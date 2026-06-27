@@ -228,6 +228,25 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
         {/* Gate 1: script */}
         {viewing === "script" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {m.title && (
+              <div className="ds-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8,
+                borderColor: "var(--color-cyan)" }}>
+                <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)" }}>Title card</span>
+                {editable ? (
+                  <>
+                    <input className="input" defaultValue={m.title.text}
+                      onBlur={(e) => post("segments", { op: "editTitle", text: e.target.value })} />
+                    <input className="input" placeholder="Subtitle" defaultValue={m.title.subtitle ?? ""}
+                      onBlur={(e) => post("segments", { op: "editTitle", subtitle: e.target.value })} />
+                  </>
+                ) : (
+                  <>
+                    <p style={{ margin: 0, color: "var(--text-body)", fontWeight: 600 }}>{m.title.text}</p>
+                    {m.title.subtitle && <p style={{ margin: 0, color: "var(--text-meta)" }}>{m.title.subtitle}</p>}
+                  </>
+                )}
+              </div>
+            )}
             {m.segments.map((s) => (
               <div key={s.id} className="ds-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8 }}>
                 <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)" }}>{s.id}</span>
@@ -265,6 +284,29 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
         {/* Gate 3: images — one labeled row of still figures per segment */}
         {viewing === "images" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {m.title && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)" }}>Title card</span>
+                <figure className="ds-card" style={{ margin: 0, padding: 10, overflow: "hidden", maxWidth: 360 }}>
+                  {m.title.image
+                    ? <img src={`/api/assets/${slug}/images/title.png`} alt="Title card"
+                        style={{ width: "100%", borderRadius: "var(--radius-sm)", display: "block",
+                          border: "1px solid var(--border-hairline)" }} />
+                    : <div style={{ width: "100%", aspectRatio: "16/9", borderRadius: "var(--radius-sm)",
+                        background: "var(--surface-code)", border: "1px solid var(--border-hairline)", display: "grid",
+                        placeItems: "center", color: "var(--text-disabled)", fontSize: 12 }}>not generated</div>}
+                  <figcaption style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                    marginTop: 8 }}>
+                    <span className="mono" style={{ fontSize: 11, color: "var(--text-meta)" }}>{m.title.text}</span>
+                    {editable && (
+                      <button className="btn btn--secondary btn--sm" disabled={!!busy}
+                        onClick={() => post("segments", { op: "rejectTitleImage" })}>
+                        ⟳ Regenerate</button>
+                    )}
+                  </figcaption>
+                </figure>
+              </div>
+            )}
             {m.segments.map((s) => (
               <div key={s.id} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)" }}>{s.id}</span>

@@ -81,6 +81,30 @@ test("never emits a zero-frame still even when stills outnumber frames", () => {
   expect(Math.min(...frames)).toBeGreaterThanOrEqual(1);
 });
 
+test("emits an intro from the title card when it has an image", () => {
+  const dir = projectWith([{ durationSec: 2, weights: [1] }]);
+  const m = loadManifest(dir);
+  m.title = {
+    text: "The Discovery", subtitle: "A tagline",
+    imagePrompt: "p", durationSec: 4,
+    kenBurns: { from: { x: 0, y: 0, w: 1, h: 1 }, to: { x: 0.05, y: 0.05, w: 0.9, h: 0.9 } },
+    image: { path: "assets/images/title.png", seed: 1, provider: "x", approved: true },
+  };
+  saveManifest(dir, m);
+
+  const props = buildInputProps(loadManifest(dir));
+  expect(props.intro?.text).toBe("The Discovery");
+  expect(props.intro?.subtitle).toBe("A tagline");
+  expect(props.intro?.imagePath).toBe("assets/images/title.png");
+  expect(props.intro?.durationInFrames).toBe(120); // 4s * 30
+  expect(props.intro?.kenBurns.to.w).toBe(0.9);
+});
+
+test("omits the intro when there is no title or the title has no image", () => {
+  const dir = projectWith([{ durationSec: 2, weights: [1] }]);
+  expect(buildInputProps(loadManifest(dir)).intro).toBeUndefined();
+});
+
 test("each still carries its own image path and ken burns", () => {
   const dir = projectWith([{ durationSec: 2, weights: [1, 1] }]);
   const props = buildInputProps(loadManifest(dir));

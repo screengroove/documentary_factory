@@ -25,6 +25,15 @@ function projectWithShots() {
   saveManifest(dir, m);
   return dir;
 }
+// Same project, plus the optional opening title card (its own prompt + motion).
+function projectWithTitle() {
+  const dir = projectWithShots();
+  const m = loadManifest(dir);
+  const kb = { from: { x: 0, y: 0, w: 1, h: 1 }, to: { x: 0, y: 0, w: 1, h: 1 } };
+  m.title = { text: "T", imagePrompt: "tp", durationSec: 4, kenBurns: kb };
+  saveManifest(dir, m);
+  return dir;
+}
 afterEach(() => { for (const d of dirs) rmSync(d, { recursive: true, force: true }); });
 
 const fakeFetch = (async () =>
@@ -109,4 +118,60 @@ test("regenerates only stills flagged needsRegen", async () => {
   // Regenerated still keeps its original seed and is reset to unapproved.
   expect(m.segments[1].stills?.[0].image?.seed).toBe(2);
   expect(m.segments[1].stills?.[0].image?.approved).toBe(false);
+});
+
+test("generates and downloads the title card background image", async () => {
+  const dir = projectWithTitle();
+  const deps = makeFakeDeps({
+    images: { generate: async () => ({ url: "http://fake/i.png", provider: "fake" }) },
+  });
+  await runImages(dir, deps, { fetchFn: fakeFetch });
+
+  const m = loadManifest(dir);
+  expect(m.title?.image?.path).toBe("assets/images/title.png");
+  expect(m.title?.image?.approved).toBe(false);
+  expect(m.title?.image?.seed).toBe(deterministicSeed("title"));
+  expect(existsSync(join(dir, "assets/images/title.png"))).toBe(true);
+});
+
+test("skips an already-approved title image", async () => {
+  const dir = projectWithTitle();
+  let m = loadManifest(dir);
+  m.title!.image = {
+    path: "assets/images/title.png", seed: 9, provider: "x", approved: true,
+  };
+  saveManifest(dir, m);
+
+  let titleCalls = 0;
+  const deps = makeFakeDeps({
+    images: { generate: async ({ prompt }) => {
+      if (prompt === "tp") titleCalls++;
+      return { url: "http://fake/i.png", provider: "fake" };
+    } },
+  });
+  await runImages(dir, deps, { fetchFn: fakeFetch });
+  expect(titleCalls).toBe(0); // approved title left untouched
+});
+
+test("regenerates a title image flagged needsRegen", async () => {
+  const dir = projectWithTitle();
+  let m = loadManifest(dir);
+  m.title!.image = {
+    path: "assets/images/title.png", seed: 9, provider: "x", approved: true, needsRegen: true,
+  };
+  saveManifest(dir, m);
+
+  let titleCalls = 0;
+  const deps = makeFakeDeps({
+    images: { generate: async ({ prompt }) => {
+      if (prompt === "tp") titleCalls++;
+      return { url: "http://fake/i.png", provider: "fake" };
+    } },
+  });
+  await runImages(dir, deps, { fetchFn: fakeFetch });
+  expect(titleCalls).toBe(1); // flagged title regenerated
+
+  m = loadManifest(dir);
+  expect(m.title?.image?.seed).toBe(9); // keeps its original seed
+  expect(m.title?.image?.approved).toBe(false);
 });

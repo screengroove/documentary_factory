@@ -18,6 +18,16 @@ const StageStateSchema = z.object({
 
 const WordSchema = z.object({ word: z.string(), start: z.number(), end: z.number() });
 
+// A generated image asset, shared by stills and the title card. `needsRegen` is
+// set by a reject action and triggers a single regeneration of just this image.
+const ImageSchema = z.object({
+  path: z.string(),
+  seed: z.number().int(),
+  provider: z.string(),
+  approved: z.boolean(),
+  needsRegen: z.boolean().optional(),
+});
+
 // One still in a segment's visual sequence: its prompt, motion, relative duration
 // weight, and (once generated) its image. A segment with a single still behaves
 // exactly like the old one-image-per-segment model.
@@ -25,15 +35,22 @@ const StillSchema = z.object({
   imagePrompt: z.string(),
   kenBurns: z.object({ from: RectSchema, to: RectSchema }),
   weight: z.number().positive(), // relative share of the segment's duration
-  image: z.object({
-    path: z.string(),
-    seed: z.number().int(),
-    provider: z.string(),
-    approved: z.boolean(),
-    needsRegen: z.boolean().optional(), // set by rejectImage; triggers single-still regen
-  }).optional(),
+  image: ImageSchema.optional(),
 });
 export type Still = z.infer<typeof StillSchema>;
+
+// The auto-generated opening title card: a text-free background image (its own
+// prompt + Ken Burns) over which the render draws the title/subtitle as crisp
+// typography. Plays for `durationSec` before the first segment.
+const TitleSchema = z.object({
+  text: z.string(),
+  subtitle: z.string().optional(),
+  imagePrompt: z.string(),
+  durationSec: z.number().positive(),
+  kenBurns: z.object({ from: RectSchema, to: RectSchema }),
+  image: ImageSchema.optional(),
+});
+export type Title = z.infer<typeof TitleSchema>;
 
 const SegmentSchema = z.object({
   id: z.string(),
@@ -66,6 +83,7 @@ export const ManifestSchema = z.object({
       typeof StageStateSchema
     >,
   ),
+  title: TitleSchema.optional(),
   segments: z.array(SegmentSchema),
   timeline: z.object({
     fps: z.number(),

@@ -2,8 +2,8 @@ import { afterEach, expect, test } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createProject, loadManifest, saveManifest, type Still } from "@doc/core";
-import { approveStage, editNarration, editPrompt, rejectImage, rejectAudio } from "./edits.js";
+import { createProject, loadManifest, saveManifest, type Still, type Title } from "@doc/core";
+import { approveStage, editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage } from "./edits.js";
 
 const dirs: string[] = [];
 function proj() {
@@ -21,6 +21,18 @@ function still(prompt: string, image?: Still["image"] | null): Still {
     imagePrompt: prompt,
     kenBurns: { from: RECT, to: RECT },
     weight: 1,
+    ...(image === null || image === undefined ? {} : { image }),
+  };
+}
+
+// Build a Zod-valid title; pass `image` overrides (or null for no image yet).
+function title(image?: Title["image"] | null): Title {
+  return {
+    text: "My Title",
+    subtitle: "A subtitle",
+    imagePrompt: "tp",
+    durationSec: 3,
+    kenBurns: { from: RECT, to: RECT },
     ...(image === null || image === undefined ? {} : { image }),
   };
 }
@@ -70,6 +82,60 @@ test("approveStage('images') approves every still's image across all segments", 
   // The image-less still is untouched (still has no image).
   expect(segs[1].stills![0].image).toBeUndefined();
   expect(loadManifest(dir).stages.images.status).toBe("approved");
+});
+
+test("approveStage('images') approves the title image too", () => {
+  const dir = proj();
+  const m = loadManifest(dir);
+  m.stages.images.status = "awaiting_review";
+  m.title = title({ path: "title.png", seed: 1, provider: "x", approved: false, needsRegen: true });
+  m.segments = [];
+  saveManifest(dir, m);
+  approveStage(dir, "images");
+  const got = loadManifest(dir).title!.image!;
+  expect(got.approved).toBe(true);
+  expect(got.needsRegen).toBeUndefined();
+});
+
+test("editTitle updates text and subtitle before script approval", () => {
+  const dir = proj();
+  const m = loadManifest(dir);
+  m.title = title();
+  saveManifest(dir, m);
+  editTitle(dir, { text: "New Title", subtitle: "New Sub" });
+  const t = loadManifest(dir).title!;
+  expect(t.text).toBe("New Title");
+  expect(t.subtitle).toBe("New Sub");
+});
+
+test("editTitle clears subtitle when given an empty string", () => {
+  const dir = proj();
+  const m = loadManifest(dir);
+  m.title = title();
+  saveManifest(dir, m);
+  editTitle(dir, { subtitle: "" });
+  expect(loadManifest(dir).title!.subtitle).toBeUndefined();
+});
+
+test("editTitle throws once the script stage is approved", () => {
+  const dir = proj();
+  const m = loadManifest(dir);
+  m.title = title();
+  m.stages.script.status = "approved";
+  saveManifest(dir, m);
+  expect(() => editTitle(dir, { text: "x" })).toThrow(/approved/);
+});
+
+test("rejectTitleImage flips approved to false, sets needsRegen, bumps seed", () => {
+  const dir = proj();
+  const m = loadManifest(dir);
+  m.title = title({ path: "title.png", seed: 5, provider: "x", approved: true });
+  saveManifest(dir, m);
+  rejectTitleImage(dir);
+  const got = loadManifest(dir).title!.image!;
+  expect(got.approved).toBe(false);
+  expect(got.needsRegen).toBe(true);
+  expect(got.seed).toBe(6);
 });
 
 test("editNarration updates text before script approval", () => {

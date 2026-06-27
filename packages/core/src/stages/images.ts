@@ -26,6 +26,23 @@ export async function runImages(
   m.stages.images.status = "running";
   saveManifest(projectDir, m);
 
+  // Title card background: same skip/seed/download pattern as a still, but the
+  // title is optional so this whole block is a no-op when absent.
+  if (m.title && (!m.title.image || m.title.image.needsRegen)) {
+    const seed = m.title.image?.seed ?? deterministicSeed("title");
+    const { url, provider } = await deps.images.generate({
+      prompt: m.title.imagePrompt, seed, width, height,
+    });
+
+    const res = await fetchFn(url);
+    if (!res.ok) throw new Error(`Image download failed for title: ${res.status}`);
+    const bytes = Buffer.from(await res.arrayBuffer());
+    writeFileSync(join(projectPaths(projectDir).images, "title.png"), bytes);
+
+    m.title.image = { path: "assets/images/title.png", seed, provider, approved: false };
+    saveManifest(projectDir, m);
+  }
+
   for (const seg of m.segments) {
     if (!seg.stills) throw new Error(`Segment ${seg.id} has no stills; run shotlist first`);
 

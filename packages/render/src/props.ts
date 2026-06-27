@@ -2,7 +2,8 @@ import type { DocumentaryProps } from "@doc/core";
 export type { DocumentaryProps };
 
 export function totalFrames(props: DocumentaryProps): number {
-  return props.segments.reduce((n, s) => n + s.durationInFrames, 0);
+  const intro = props.intro?.durationInFrames ?? 0;
+  return intro + props.segments.reduce((n, s) => n + s.durationInFrames, 0);
 }
 
 export function dimensions(aspectRatio: DocumentaryProps["aspectRatio"]) {

@@ -9,9 +9,11 @@ export function approveStage(dir: string, stage: StageName): void {
     throw new Error(
       `Cannot approve ${stage}: status is "${m.stages[stage].status}", expected "awaiting_review". Run the stage first.`,
     );
-  if (stage === "images")
+  if (stage === "images") {
     for (const s of m.segments) for (const still of s.stills ?? [])
       if (still.image) { still.image.approved = true; delete still.image.needsRegen; }
+    if (m.title?.image) { m.title.image.approved = true; delete m.title.image.needsRegen; }
+  }
   m.stages[stage].status = "approved";
   m.stages[stage].completedAt = new Date().toISOString();
   saveManifest(dir, m);
@@ -57,6 +59,25 @@ export function rejectImage(dir: string, id: string, stillIndex: number, opts: {
   // would otherwise reproduce the same one); caller may override.
   st.image.seed = opts.seed ?? st.image.seed + 1;
   if (opts.prompt !== undefined) st.imagePrompt = opts.prompt;
+  saveManifest(dir, m);
+}
+
+export function editTitle(dir: string, fields: { text?: string; subtitle?: string }): void {
+  const m = loadManifest(dir);
+  if (!m.title) throw new Error("No title card");
+  if (m.stages.script.status === "approved") throw new Error("Script already approved");
+  if (fields.text !== undefined) m.title.text = fields.text;
+  if (fields.subtitle !== undefined) m.title.subtitle = fields.subtitle || undefined;
+  saveManifest(dir, m);
+}
+
+export function rejectTitleImage(dir: string, opts: { seed?: number; prompt?: string } = {}): void {
+  const m = loadManifest(dir);
+  if (!m.title?.image) throw new Error("No title image");
+  m.title.image.needsRegen = true;
+  m.title.image.approved = false;
+  m.title.image.seed = opts.seed ?? m.title.image.seed + 1;
+  if (opts.prompt !== undefined) m.title.imagePrompt = opts.prompt;
   saveManifest(dir, m);
 }
 

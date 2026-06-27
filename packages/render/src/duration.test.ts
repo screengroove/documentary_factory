@@ -15,3 +15,15 @@ test("totalFrames sums segment frames", () => {
   };
   expect(totalFrames(props)).toBe(150);
 });
+
+test("totalFrames includes the intro card", () => {
+  const kb = { from: { x:0,y:0,w:1,h:1 }, to: { x:0,y:0,w:1,h:1 } };
+  const props = {
+    fps: 30, aspectRatio: "16:9" as const,
+    intro: { imagePath: "t", durationInFrames: 120, kenBurns: kb, text: "T" },
+    segments: [
+      { id: "a", durationInFrames: 60, words: [], stills: [{ imagePath: "x", durationInFrames: 60, kenBurns: kb }] },
+    ],
+  };
+  expect(totalFrames(props)).toBe(180);
+});

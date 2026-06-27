@@ -86,6 +86,38 @@ test("accepts a fully-populated segment with multiple stills", () => {
   expect(parsed.segments[0].stills?.[1].image).toBeUndefined();
 });
 
+test("accepts a manifest with an auto-generated title card", () => {
+  const withTitle = {
+    ...minimal,
+    title: {
+      text: "The Discovery of Rapamycin",
+      subtitle: "A story from Easter Island",
+      imagePrompt: "a windswept Easter Island coastline at dawn, 1970s 35mm film",
+      durationSec: 4,
+      kenBurns: { from: { x: 0, y: 0, w: 1, h: 1 }, to: { x: 0.05, y: 0.05, w: 0.9, h: 0.9 } },
+      image: { path: "assets/images/title.png", seed: 7, provider: "x", approved: true },
+    },
+  };
+  const parsed = ManifestSchema.parse(withTitle);
+  expect(parsed.title?.text).toBe("The Discovery of Rapamycin");
+  expect(parsed.title?.image?.seed).toBe(7);
+});
+
+test("accepts a title with no subtitle and no image yet", () => {
+  const withTitle = {
+    ...minimal,
+    title: {
+      text: "Untitled",
+      imagePrompt: "x",
+      durationSec: 4,
+      kenBurns: { from: { x: 0, y: 0, w: 1, h: 1 }, to: { x: 0, y: 0, w: 1, h: 1 } },
+    },
+  };
+  const parsed = ManifestSchema.parse(withTitle);
+  expect(parsed.title?.subtitle).toBeUndefined();
+  expect(parsed.title?.image).toBeUndefined();
+});
+
 test("rejects a non-positive still weight", () => {
   const bad = {
     ...minimal,
