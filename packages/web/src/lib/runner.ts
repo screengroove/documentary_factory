@@ -11,7 +11,7 @@ export const STAGE_RUNNERS: Record<StageName, (dir: string, deps: StageDeps) => 
   shotlist: runShotlist,
   images: (dir, deps) => runImages(dir, deps),
   voiceover: (dir, deps) => runVoiceover(dir, deps),
-  assemble: (dir) => runAssemble(dir),
+  assemble: (dir) => runAssemble(dir, { musicLibDir: join(process.cwd(), "..", "core", "assets", "music") }),
 };
 
 export async function runStageWith(dir: string, stage: StageName, deps: StageDeps): Promise<void> {

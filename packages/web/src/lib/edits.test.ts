@@ -1,9 +1,9 @@
 import { afterEach, expect, test } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createProject, loadManifest, saveManifest, type Still, type Title } from "@doc/core";
-import { approveStage, editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage } from "./edits.js";
+import { approveStage, editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage, setMusicTrack } from "./edits.js";
 
 const dirs: string[] = [];
 function proj() {
@@ -191,4 +191,28 @@ test("rejectAudio clears audio so it will regenerate", () => {
   saveManifest(dir, m);
   rejectAudio(dir, "seg-001");
   expect(loadManifest(dir).segments[0].audio).toBeUndefined();
+});
+
+test("setMusicTrack copies the chosen track into the project and records it", () => {
+  const dir = proj();
+  setMusicTrack(dir, "schellekens-medieval");
+  const m = loadManifest(dir);
+  expect(m.music?.trackId).toBe("schellekens-medieval");
+  expect(m.music?.path).toBe("assets/music/schellekens-medieval.mp3");
+  expect(m.music?.volume).toBe(0.15);
+  expect(existsSync(join(dir, "assets/music/schellekens-medieval.mp3"))).toBe(true);
+});
+
+test("setMusicTrack preserves an existing volume", () => {
+  const dir = proj();
+  let m = loadManifest(dir);
+  m.music = { trackId: "mamoun-statement-1", path: "assets/music/mamoun-statement-1.mp3", volume: 0.3 };
+  saveManifest(dir, m);
+  setMusicTrack(dir, "schellekens-medieval");
+  expect(loadManifest(dir).music?.volume).toBe(0.3);
+});
+
+test("setMusicTrack throws on an unknown track id", () => {
+  const dir = proj();
+  expect(() => setMusicTrack(dir, "nope")).toThrow(/unknown/i);
 });

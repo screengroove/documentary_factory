@@ -1,4 +1,6 @@
-import { loadManifest, saveManifest, type StageName, type Still } from "@doc/core";
+import { copyFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { loadManifest, saveManifest, type StageName, type Still, CATALOG, trackSourcePath, DEFAULT_MUSIC_VOLUME } from "@doc/core";
 
 export function approveStage(dir: string, stage: StageName): void {
   const m = loadManifest(dir);
@@ -84,5 +86,20 @@ export function rejectTitleImage(dir: string, opts: { seed?: number; prompt?: st
 export function rejectAudio(dir: string, id: string): void {
   const { m, s } = seg(dir, id);
   delete s.audio;
+  saveManifest(dir, m);
+}
+
+export function setMusicTrack(dir: string, trackId: string, opts: { musicLibDir?: string } = {}): void {
+  const m = loadManifest(dir);
+  const track = CATALOG.find((t) => t.id === trackId);
+  if (!track) throw new Error(`Unknown music track: ${trackId}`);
+  const destDir = join(dir, "assets/music");
+  mkdirSync(destDir, { recursive: true }); // older projects may predate the dir
+  copyFileSync(trackSourcePath(track, opts.musicLibDir), join(destDir, track.file));
+  m.music = {
+    trackId: track.id,
+    path: `assets/music/${track.file}`,
+    volume: m.music?.volume ?? DEFAULT_MUSIC_VOLUME,
+  };
   saveManifest(dir, m);
 }
