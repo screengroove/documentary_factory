@@ -1,0 +1,4 @@
+# /projects/ holds runtime-generated documentaries (manifests + assets) — user data,
+# not source, and ~255 MB. Excluding it keeps it out of the Serverless Function bundle.
+# Anchored to repo root so it doesn't match source dirs like src/app/api/projects/.
+/projects/
