@@ -52,6 +52,15 @@ const TitleSchema = z.object({
 });
 export type Title = z.infer<typeof TitleSchema>;
 
+// The background-music selection: which catalog track, where its file was copied
+// into the project, and its mix volume (0..1).
+const MusicSchema = z.object({
+  trackId: z.string(),
+  path: z.string(),
+  volume: z.number(),
+});
+export type Music = z.infer<typeof MusicSchema>;
+
 const SegmentSchema = z.object({
   id: z.string(),
   order: z.number().int(),
@@ -84,6 +93,7 @@ export const ManifestSchema = z.object({
     >,
   ),
   title: TitleSchema.optional(),
+  music: MusicSchema.optional(),
   segments: z.array(SegmentSchema),
   timeline: z.object({
     fps: z.number(),

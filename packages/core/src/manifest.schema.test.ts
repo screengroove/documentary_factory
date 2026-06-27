@@ -118,6 +118,21 @@ test("accepts a title with no subtitle and no image yet", () => {
   expect(parsed.title?.image).toBeUndefined();
 });
 
+test("accepts a manifest with a music block", () => {
+  const withMusic = {
+    ...minimal,
+    music: { trackId: "mamoun-statement-1", path: "assets/music/mamoun-statement-1.mp3", volume: 0.15 },
+  };
+  const parsed = ManifestSchema.parse(withMusic);
+  expect(parsed.music?.trackId).toBe("mamoun-statement-1");
+  expect(parsed.music?.volume).toBe(0.15);
+});
+
+test("rejects a music block missing its path", () => {
+  const bad = { ...minimal, music: { trackId: "x", volume: 0.15 } };
+  expect(() => ManifestSchema.parse(bad)).toThrow();
+});
+
 test("rejects a non-positive still weight", () => {
   const bad = {
     ...minimal,
