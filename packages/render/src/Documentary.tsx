@@ -2,6 +2,7 @@ import { Sequence, staticFile } from "remotion";
 import type { DocumentaryProps } from "./props.js";
 import { Segment } from "./Segment.js";
 import { Intro } from "./Intro.js";
+import { Music } from "./Music.js";
 
 export function Documentary({ props }: { props: DocumentaryProps }) {
   const intro = props.intro;
@@ -9,6 +10,7 @@ export function Documentary({ props }: { props: DocumentaryProps }) {
   let start = intro?.durationInFrames ?? 0;
   return (
     <>
+      {props.music && <Music music={props.music} />}
       {intro && (
         <Sequence from={0} durationInFrames={intro.durationInFrames}>
           <Intro intro={intro} />
