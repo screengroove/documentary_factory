@@ -25,7 +25,9 @@ function distributeFrames(weights: number[], total: number): number[] {
   const sum = weights.reduce((a, b) => a + b, 0);
   let acc = 0;
   return weights.map((w, i) => {
-    if (i === weights.length - 1) return total - acc;
+    // The last still absorbs the remainder for an exact sum; clamp to >= 1 so a
+    // pathological still-heavy segment never yields a zero-length render window.
+    if (i === weights.length - 1) return Math.max(1, total - acc);
     const f = Math.max(1, Math.round((total * w) / sum));
     acc += f;
     return f;

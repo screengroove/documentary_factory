@@ -72,6 +72,15 @@ test("the last still absorbs the rounding remainder so frames sum exactly", () =
   expect(frames.reduce((a, b) => a + b, 0)).toBe(seg.durationInFrames);
 });
 
+test("never emits a zero-frame still even when stills outnumber frames", () => {
+  // Degenerate (unreachable with real seconds-long audio, but a 0-frame window
+  // would crash the render's interpolate). Every still must keep >= 1 frame.
+  const dir = projectWith([{ durationSec: 2 / 30, weights: [1, 1, 1] }]); // D = 2
+  const props = buildInputProps(loadManifest(dir));
+  const frames = props.segments[0].stills.map((s) => s.durationInFrames);
+  expect(Math.min(...frames)).toBeGreaterThanOrEqual(1);
+});
+
 test("each still carries its own image path and ken burns", () => {
   const dir = projectWith([{ durationSec: 2, weights: [1, 1] }]);
   const props = buildInputProps(loadManifest(dir));
