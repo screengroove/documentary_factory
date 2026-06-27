@@ -23,6 +23,7 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
   const [m, setM] = useState(initial);
   const [viewing, setViewing] = useState<StageName>(activeStage(initial));
   const [actionError, setActionError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
 
   const active = activeStage(m);
   const editable = viewing === active; // you can only act on the active stage
@@ -43,6 +44,29 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       setActionError(data.error ?? `Request to ${path} failed (${res.status})`);
+    }
+    return refresh();
+  };
+
+  // Run/render hold the request open for the whole batch (minutes for images/audio).
+  // Stages persist the manifest per-segment, so poll while in flight to stream
+  // progress in, and show a busy banner so the UI never looks stalled/broken.
+  const longPost = async (path: string, body: unknown, label: string): Promise<Manifest> => {
+    setActionError(null);
+    setBusy(label);
+    const poll = setInterval(() => { void refresh(); }, 2500);
+    try {
+      const res = await fetch(`/api/projects/${slug}/${path}`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.error ?? `Request to ${path} failed (${res.status})`);
+      }
+    } finally {
+      clearInterval(poll);
+      setBusy(null);
     }
     return refresh();
   };
@@ -94,14 +118,21 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
 
       {viewingStage.error && <p style={{ color: "crimson" }}>Error: {viewingStage.error}</p>}
       {actionError && <p style={{ color: "crimson" }}>Action failed: {actionError}</p>}
+      {busy && (
+        <p style={{ color: "#2563eb", margin: "8px 0" }}>
+          ⏳ {busy} — this can take a minute or two; results stream in as they finish.
+        </p>
+      )}
 
       {/* Action bar — only on the active stage; otherwise read-only notice */}
       {editable ? (
         <div style={{ display: "flex", gap: 8, margin: "12px 0" }}>
-          <button onClick={() => post("run", { stage: active })}>Run “{active}”</button>
-          <button onClick={approve}>Approve “{active}”</button>
+          <button disabled={!!busy} onClick={() => longPost("run", { stage: active }, `Running “${active}”`)}>
+            Run “{active}”
+          </button>
+          <button disabled={!!busy} onClick={approve}>Approve “{active}”</button>
           {active === "assemble" && m.stages.voiceover.status === "approved" && (
-            <button onClick={() => post("render", {})}>Render video</button>
+            <button disabled={!!busy} onClick={() => longPost("render", {}, "Rendering video")}>Render video</button>
           )}
         </div>
       ) : (
@@ -143,7 +174,7 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
             : <div style={{ width: 240, height: 135, background: "#f0f0f0", display: "grid", placeItems: "center", color: "#999" }}>not generated</div>}
           {editable && (
             <figcaption>
-              <button onClick={() => post("segments", { op: "rejectImage", id: s.id, seed: s.image?.seed ? s.image.seed + 1 : 1 })}>
+              <button disabled={!!busy} onClick={() => post("segments", { op: "rejectImage", id: s.id, seed: s.image?.seed ? s.image.seed + 1 : 1 })}>
                 Regenerate
               </button>
             </figcaption>
@@ -159,7 +190,7 @@ export function GateClient({ slug, initial }: { slug: string; initial: Manifest 
             ? <audio controls src={`/api/assets/${slug}/audio/${s.id}.wav`} />
             : <span style={{ color: "#999" }}>— not generated yet —</span>}
           {editable && (
-            <button onClick={() => post("segments", { op: "rejectAudio", id: s.id })}>Re-record</button>
+            <button disabled={!!busy} onClick={() => post("segments", { op: "rejectAudio", id: s.id })}>Re-record</button>
           )}
         </div>
       ))}
