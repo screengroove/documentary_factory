@@ -38,6 +38,8 @@ export function GateClient({ slug, initial, tracks }: {
   // Bumped after each render to bust the browser cache of the <video>/download.
   const [videoVersion, setVideoVersion] = useState(0);
   const [voiceoverTab, setVoiceoverTab] = useState<"segments" | "pronunciation">("segments");
+  // Bumped after an image upload to bust the browser cache of the replaced still.
+  const [assetV, setAssetV] = useState(0);
 
   const checkVideo = async () => {
     const res = await fetch(`/api/projects/${slug}/video`, { method: "HEAD" }).catch(() => null);
@@ -66,6 +68,28 @@ export function GateClient({ slug, initial, tracks }: {
       setActionError(data.error ?? `Request to ${path} failed (${res.status})`);
     }
     return refresh();
+  };
+
+  // Upload a user image to replace a still (multipart, not JSON like post()).
+  const uploadImage = async (id: string, stillIndex: number, file: File): Promise<void> => {
+    setActionError(null);
+    setBusy("upload");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("id", id);
+      fd.append("stillIndex", String(stillIndex));
+      const res = await fetch(`/api/projects/${slug}/images/upload`, { method: "POST", body: fd });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setActionError(data.error ?? `Upload failed (${res.status})`);
+      } else {
+        setAssetV((v) => v + 1);
+      }
+    } finally {
+      setBusy(null);
+      await refresh();
+    }
   };
 
   // Run/render hold the request open for the whole batch (minutes for images/audio).
@@ -324,19 +348,26 @@ export function GateClient({ slug, initial, tracks }: {
                   {(s.stills ?? []).map((st, i) => (
                     <figure key={i} className="ds-card" style={{ margin: 0, padding: 10, overflow: "hidden" }}>
                       {st.image
-                        ? <img src={`/api/assets/${slug}/images/${s.id}-${i}.png`} alt={`${s.id} #${i + 1}`}
+                        ? <img src={`/api/assets/${slug}/${st.image.path.replace(/^assets\//, "")}?v=${assetV}`} alt={`${s.id} #${i + 1}`}
                             style={{ width: "100%", borderRadius: "var(--radius-sm)", display: "block",
                               border: "1px solid var(--border-hairline)" }} />
                         : <div style={{ width: "100%", aspectRatio: "16/9", borderRadius: "var(--radius-sm)",
                             background: "var(--surface-code)", border: "1px solid var(--border-hairline)", display: "grid",
                             placeItems: "center", color: "var(--text-disabled)", fontSize: 12 }}>not generated</div>}
                       <figcaption style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
-                        marginTop: 8 }}>
+                        marginTop: 8, gap: 6 }}>
                         <span className="mono" style={{ fontSize: 11, color: "var(--text-meta)" }}>#{i + 1}</span>
                         {editable && (
-                          <button className="btn btn--secondary btn--sm" disabled={!!busy}
-                            onClick={() => post("segments", { op: "rejectImage", id: s.id, stillIndex: i, seed: st.image?.seed ? st.image.seed + 1 : 1 })}>
-                            ⟳ Regenerate</button>
+                          <span style={{ display: "flex", gap: 6 }}>
+                            <label className="btn btn--secondary btn--sm" style={{ cursor: busy ? "not-allowed" : "pointer" }}>
+                              ⬆ Upload
+                              <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={!!busy}
+                                onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadImage(s.id, i, f); e.target.value = ""; }} />
+                            </label>
+                            <button className="btn btn--secondary btn--sm" disabled={!!busy}
+                              onClick={() => post("segments", { op: "rejectImage", id: s.id, stillIndex: i, seed: st.image?.seed ? st.image.seed + 1 : 1 })}>
+                              ⟳ Regenerate</button>
+                          </span>
                         )}
                       </figcaption>
                     </figure>

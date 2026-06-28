@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadManifest, saveManifest, type StageName, type Still, type PronunciationEntry, applyPronunciations, CATALOG, trackSourcePath, DEFAULT_MUSIC_VOLUME } from "@doc/core";
 
@@ -61,6 +61,22 @@ export function rejectImage(dir: string, id: string, stillIndex: number, opts: {
   // would otherwise reproduce the same one); caller may override.
   st.image.seed = opts.seed ?? st.image.seed + 1;
   if (opts.prompt !== undefined) st.imagePrompt = opts.prompt;
+  saveManifest(dir, m);
+}
+
+// Replace a still's image with a user-uploaded file. Writes into the same
+// assets/images slot generated images use (preserving the upload's extension),
+// removes the previous file, and records the image with provider "upload" and
+// no needsRegen — so runImages skips it and the existing review/render path
+// treats it like any other image. Only meaningful at the active images gate.
+export function uploadStillImage(dir: string, id: string, stillIndex: number, file: { bytes: Buffer; ext: string }): void {
+  const { m, s } = seg(dir, id);
+  const st = still(s, stillIndex);
+  if (st.image) { try { rmSync(join(dir, st.image.path)); } catch { /* old file may be absent */ } }
+  const rel = `assets/images/${id}-${stillIndex}.${file.ext}`;
+  mkdirSync(join(dir, "assets/images"), { recursive: true });
+  writeFileSync(join(dir, rel), file.bytes);
+  st.image = { path: rel, seed: st.image?.seed ?? 0, provider: "upload", approved: false };
   saveManifest(dir, m);
 }
 

@@ -1,9 +1,9 @@
 import { afterEach, expect, test } from "vitest";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createProject, loadManifest, saveManifest, type Still, type Title } from "@doc/core";
-import { approveStage, editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage, setMusicTrack, setMusicEnabled, setPronunciations, prepareReRecord } from "./edits.js";
+import { approveStage, editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage, setMusicTrack, setMusicEnabled, setPronunciations, prepareReRecord, uploadStillImage } from "./edits.js";
 
 const dirs: string[] = [];
 function proj() {
@@ -238,6 +238,26 @@ test("setMusicEnabled is a no-op when no track is staged", () => {
   const dir = proj();
   setMusicEnabled(dir, true);
   expect(loadManifest(dir).music).toBeUndefined();
+});
+
+test("uploadStillImage writes the file, removes the old one, records an upload image", () => {
+  const dir = proj();
+  const m = loadManifest(dir);
+  m.segments = [{ id: "seg-001", order: 0, narration: "n",
+    stills: [still("p0", { path: "assets/images/seg-001-0.png", seed: 5, provider: "replicate:x", approved: true })] }];
+  saveManifest(dir, m);
+  mkdirSync(join(dir, "assets/images"), { recursive: true });
+  writeFileSync(join(dir, "assets/images/seg-001-0.png"), Buffer.from([0])); // the old generated file
+
+  uploadStillImage(dir, "seg-001", 0, { bytes: Buffer.from([1, 2, 3]), ext: "jpg" });
+
+  const got = loadManifest(dir).segments[0].stills![0].image!;
+  expect(got.path).toBe("assets/images/seg-001-0.jpg");
+  expect(got.provider).toBe("upload");
+  expect(got.approved).toBe(false);
+  expect(got.needsRegen).toBeUndefined();
+  expect(existsSync(join(dir, "assets/images/seg-001-0.jpg"))).toBe(true);
+  expect(existsSync(join(dir, "assets/images/seg-001-0.png"))).toBe(false); // old removed
 });
 
 test("setPronunciations saves entries, drops blanks, is allowed after approval, leaves audio", () => {
