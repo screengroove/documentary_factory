@@ -39,3 +39,23 @@ test("writes audio file, duration, and words", async () => {
   expect(m.segments[0].audio?.words.length).toBe(2);
   expect(m.stages.voiceover.status).toBe("awaiting_review");
 });
+
+test("applies the pronunciation dictionary and remaps caption words", async () => {
+  const dir = projectWithSegments(); // narration: "Hello there."
+  let passedText = "";
+  const deps = makeFakeDeps({
+    tts: { speak: async ({ text }) => { passedText = text; return {
+      audio: Buffer.from([1]),
+      words: [{ word: "Hello", start: 0, end: 0.5 }, { word: "thair", start: 0.5, end: 1.0 }],
+    }; } },
+  });
+  let m = loadManifest(dir);
+  m.pronunciations = [{ term: "there", respelling: "thair" }];
+  saveManifest(dir, m);
+
+  await runVoiceover(dir, deps, { getDuration: async () => 1.0 });
+
+  expect(passedText).toBe("Hello thair.");            // respelled text reaches TTS
+  m = loadManifest(dir);
+  expect(m.segments[0].audio?.words.map((w) => w.word)).toEqual(["Hello", "there"]); // caption restored
+});

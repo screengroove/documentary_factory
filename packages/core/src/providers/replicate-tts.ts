@@ -30,6 +30,28 @@ function firstUrl(output: unknown): string {
   return String(item);
 }
 
+// Kokoro synthesis only: run the model, download the WAV. Shared by speak()
+// (which then aligns) and the preview endpoint (which does not).
+async function kokoro(
+  client: Replicate, model: `${string}/${string}`, text: string, voiceId: string,
+): Promise<{ audioUrl: string; audio: Buffer }> {
+  const ttsOut = await client.run(model, { input: { text, voice: voiceId, speed: 1 } });
+  const audioUrl = firstUrl(ttsOut);
+  const res = await fetch(audioUrl);
+  if (!res.ok) throw new Error(`Kokoro audio download failed: ${res.status}`);
+  return { audioUrl, audio: Buffer.from(await res.arrayBuffer()) };
+}
+
+// Standalone Kokoro synth for previews — no WhisperX alignment (≈2× faster).
+export async function synthesize(
+  token: string, args: { text: string; voiceId: string }, opts: { ttsModel?: string } = {},
+): Promise<Buffer> {
+  const client = new Replicate({ auth: token });
+  const ttsModel = (opts.ttsModel ?? KOKORO) as `${string}/${string}`;
+  const { audio } = await kokoro(client, ttsModel, args.text, args.voiceId);
+  return audio;
+}
+
 export function replicateTts(
   token: string,
   opts: { ttsModel?: string; alignModel?: string } = {},
@@ -40,15 +62,8 @@ export function replicateTts(
 
   return {
     async speak({ text, voiceId }) {
-      // 1) Synthesize. voiceId is a Kokoro voice name, e.g. "af_sarah", "am_michael".
-      const ttsOut = await client.run(ttsModel, {
-        input: { text, voice: voiceId, speed: 1 },
-      });
-      const audioUrl = firstUrl(ttsOut);
-
-      const res = await fetch(audioUrl);
-      if (!res.ok) throw new Error(`Kokoro audio download failed: ${res.status}`);
-      const audio = Buffer.from(await res.arrayBuffer());
+      // 1) Synthesize (Kokoro). voiceId is a Kokoro voice name, e.g. "af_sarah".
+      const { audioUrl, audio } = await kokoro(client, ttsModel, text, voiceId);
 
       // 2) Align. Pass the Kokoro URL straight to WhisperX for word timestamps.
       const alignOut = (await client.run(alignModel, {

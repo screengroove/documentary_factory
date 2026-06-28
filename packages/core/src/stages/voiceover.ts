@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Input, ALL_FORMATS, FilePathSource } from "mediabunny";
 import { loadManifest, saveManifest } from "../manifest.js";
+import { applyPronunciations, remapWords } from "../pronunciation.js";
 import { projectPaths } from "../project.js";
 import type { StageDeps } from "./deps.js";
 
@@ -31,11 +32,13 @@ export async function runVoiceover(
 
   for (const seg of m.segments) {
     if (seg.audio) continue;
-    const { audio, words } = await deps.tts.speak({ text: seg.narration, voiceId });
+    const { spokenText, used } = applyPronunciations(seg.narration, m.pronunciations ?? []);
+    const { audio, words } = await deps.tts.speak({ text: spokenText, voiceId });
+    const captionWords = used.length ? remapWords(seg.narration, words, used) : words;
     const filePath = join(projectPaths(projectDir).audio, `${seg.id}.wav`);
     writeFileSync(filePath, audio);
     const durationSec = await getDuration(filePath);
-    seg.audio = { path: `assets/audio/${seg.id}.wav`, durationSec, words };
+    seg.audio = { path: `assets/audio/${seg.id}.wav`, durationSec, words: captionWords };
     saveManifest(projectDir, m); // persist per-segment
   }
 

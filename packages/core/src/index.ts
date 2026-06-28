@@ -1,7 +1,10 @@
 export const CORE_VERSION = 1;
 export * from "./manifest.js";
+export * from "./pronunciation.js";
 export * from "./project.js";
 export * from "./providers/types.js";
+export * from "./providers/anthropic.js";
+export * from "./providers/replicate-tts.js";
 export * from "./stages/deps.js";
 export * from "./stages/script.js";
 export * from "./stages/shotlist.js";

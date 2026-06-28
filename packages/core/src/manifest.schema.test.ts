@@ -133,6 +133,16 @@ test("rejects a music block missing its path", () => {
   expect(() => ManifestSchema.parse(bad)).toThrow();
 });
 
+test("pronunciations is optional and round-trips", () => {
+  const base = ManifestSchema.parse(minimal);
+  expect(base.pronunciations).toBeUndefined(); // old manifests load unchanged
+  const withDict = ManifestSchema.parse({
+    ...minimal,
+    pronunciations: [{ term: "Iwanicki", respelling: "ee-vah-NEE-tskee" }],
+  });
+  expect(withDict.pronunciations).toEqual([{ term: "Iwanicki", respelling: "ee-vah-NEE-tskee" }]);
+});
+
 test("rejects a non-positive still weight", () => {
   const bad = {
     ...minimal,

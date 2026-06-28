@@ -64,6 +64,12 @@ const MusicSchema = z.object({
 });
 export type Music = z.infer<typeof MusicSchema>;
 
+const PronunciationEntrySchema = z.object({
+  term: z.string(),       // word/phrase as it appears in narration
+  respelling: z.string(), // plain-English phonetic respelling for TTS
+});
+export type PronunciationEntry = z.infer<typeof PronunciationEntrySchema>;
+
 const SegmentSchema = z.object({
   id: z.string(),
   order: z.number().int(),
@@ -97,6 +103,7 @@ export const ManifestSchema = z.object({
   ),
   title: TitleSchema.optional(),
   music: MusicSchema.optional(),
+  pronunciations: z.array(PronunciationEntrySchema).optional(),
   segments: z.array(SegmentSchema),
   timeline: z.object({
     fps: z.number(),
