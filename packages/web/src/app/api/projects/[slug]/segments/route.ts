@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { join } from "node:path";
-import { editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage, setMusicTrack } from "@/lib/edits";
+import { editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage, setMusicTrack, setMusicEnabled } from "@/lib/edits";
 const MUSIC_LIB_DIR = join(process.cwd(), "..", "core", "assets", "music");
 import { PROJECTS_ROOT } from "@/lib/projects";
 
@@ -11,7 +11,8 @@ type Action =
   | { op: "rejectAudio"; id: string }
   | { op: "editTitle"; text?: string; subtitle?: string }
   | { op: "rejectTitleImage"; seed?: number; prompt?: string }
-  | { op: "setMusicTrack"; trackId: string };
+  | { op: "setMusicTrack"; trackId: string }
+  | { op: "setMusicEnabled"; enabled: boolean };
 
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -24,5 +25,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ slug: s
   else if (a.op === "editTitle") editTitle(dir, { text: a.text, subtitle: a.subtitle });
   else if (a.op === "rejectTitleImage") rejectTitleImage(dir, { seed: a.seed, prompt: a.prompt });
   else if (a.op === "setMusicTrack") setMusicTrack(dir, a.trackId, { musicLibDir: MUSIC_LIB_DIR });
+  else if (a.op === "setMusicEnabled") setMusicEnabled(dir, a.enabled);
   return NextResponse.json({ ok: true });
 }

@@ -364,19 +364,34 @@ export function GateClient({ slug, initial, tracks }: {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {m.music && (
               <div className="ds-card" style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10, marginBottom: 12 }}>
-                <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)" }}>Soundtrack</span>
-                <audio controls src={`/api/assets/${slug}/music/${m.music.path.split("/").pop()}`} style={{ width: "100%", height: 34 }} />
-                {editable && (
-                  <select
-                    className="input"
-                    value={m.music.trackId}
-                    disabled={!!busy}
-                    onChange={(e) => post("segments", { op: "setMusicTrack", trackId: e.target.value })}
-                  >
-                    {tracks.map((t) => (
-                      <option key={t.id} value={t.id}>{t.title} — {t.composer}</option>
-                    ))}
-                  </select>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)" }}>Soundtrack</span>
+                  <label className="mono" style={{ fontSize: 11, color: "var(--text-body)", display: "flex", alignItems: "center", gap: 6, cursor: editable ? "pointer" : "default" }}>
+                    <input
+                      type="checkbox"
+                      checked={!!m.music.enabled}
+                      disabled={!editable || !!busy}
+                      onChange={(e) => post("segments", { op: "setMusicEnabled", enabled: e.target.checked })}
+                    />
+                    Add Music Track
+                  </label>
+                </div>
+                {m.music.enabled && (
+                  <>
+                    <audio controls src={`/api/assets/${slug}/music/${m.music.path.split("/").pop()}`} style={{ width: "100%", height: 34 }} />
+                    {editable && (
+                      <select
+                        className="input"
+                        value={m.music.trackId}
+                        disabled={!!busy}
+                        onChange={(e) => post("segments", { op: "setMusicTrack", trackId: e.target.value })}
+                      >
+                        {tracks.map((t) => (
+                          <option key={t.id} value={t.id}>{t.title} — {t.composer}</option>
+                        ))}
+                      </select>
+                    )}
+                  </>
                 )}
               </div>
             )}

@@ -60,7 +60,8 @@ export function buildInputProps(m: Manifest): DocumentaryProps {
         ...(t.subtitle ? { subtitle: t.subtitle } : {}),
       }
     : undefined;
-  const music = m.music ? { path: m.music.path, volume: m.music.volume } : undefined;
+  // Only emit (and therefore render) music when the toggle is enabled.
+  const music = m.music?.enabled ? { path: m.music.path, volume: m.music.volume } : undefined;
   return {
     fps: FPS,
     aspectRatio: m.brief.aspectRatio,
@@ -93,12 +94,14 @@ export async function runAssemble(
     if (!s.audio) throw new Error(`Segment ${s.id} has no audio; run voiceover first`);
   }
 
-  // Auto-pick a soundtrack on first assemble; respect an existing/overridden choice.
+  // Pre-stage a tone-matched soundtrack on first assemble, but leave it disabled:
+  // music is opt-in via the assemble gate's "Add Music Track" toggle. Respect an
+  // existing/overridden choice.
   if (!m.music && CATALOG.length > 0) {
     const track = pickTrack(m.brief.tone);
     mkdirSync(projectPaths(projectDir).music, { recursive: true }); // older projects may predate the dir
     copyFileSync(trackSourcePath(track, opts.musicLibDir), join(projectPaths(projectDir).music, track.file));
-    m.music = { trackId: track.id, path: `assets/music/${track.file}`, volume: DEFAULT_MUSIC_VOLUME };
+    m.music = { trackId: track.id, path: `assets/music/${track.file}`, volume: DEFAULT_MUSIC_VOLUME, enabled: false };
   }
 
   const totalDurationSec = m.segments.reduce((sum, s) => sum + (s.audio?.durationSec ?? 0), 0);

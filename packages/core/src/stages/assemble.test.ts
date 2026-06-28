@@ -127,6 +127,7 @@ test("runAssemble auto-picks a soundtrack and copies it into the project", async
   expect(m.music?.trackId).toBe("schellekens-medieval");
   expect(m.music?.path).toBe("assets/music/schellekens-medieval.mp3");
   expect(m.music?.volume).toBe(0.1);
+  expect(m.music?.enabled).toBe(false); // pre-staged but opt-in: off by default
   expect(existsSync(join(dir, "assets/music/schellekens-medieval.mp3"))).toBe(true);
 });
 
@@ -142,15 +143,23 @@ test("runAssemble respects an already-chosen track", async () => {
   expect(loadManifest(dir).music?.volume).toBe(0.2);
 });
 
-test("buildInputProps surfaces the music block when present", () => {
+test("buildInputProps surfaces the music block when enabled", () => {
   const dir = projectWith([{ durationSec: 2, weights: [1] }]);
   const m = loadManifest(dir);
-  m.music = { trackId: "mamoun-statement-1", path: "assets/music/mamoun-statement-1.mp3", volume: 0.15 };
+  m.music = { trackId: "mamoun-statement-1", path: "assets/music/mamoun-statement-1.mp3", volume: 0.15, enabled: true };
   saveManifest(dir, m);
 
   const props = buildInputProps(loadManifest(dir));
   expect(props.music?.path).toBe("assets/music/mamoun-statement-1.mp3");
   expect(props.music?.volume).toBe(0.15);
+});
+
+test("buildInputProps omits music when the track is disabled", () => {
+  const dir = projectWith([{ durationSec: 2, weights: [1] }]);
+  const m = loadManifest(dir);
+  m.music = { trackId: "mamoun-statement-1", path: "assets/music/mamoun-statement-1.mp3", volume: 0.15, enabled: false };
+  saveManifest(dir, m);
+  expect(buildInputProps(loadManifest(dir)).music).toBeUndefined();
 });
 
 test("buildInputProps omits music when none is chosen", () => {

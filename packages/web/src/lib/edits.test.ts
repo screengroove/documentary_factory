@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createProject, loadManifest, saveManifest, type Still, type Title } from "@doc/core";
-import { approveStage, editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage, setMusicTrack } from "./edits.js";
+import { approveStage, editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage, setMusicTrack, setMusicEnabled } from "./edits.js";
 
 const dirs: string[] = [];
 function proj() {
@@ -215,4 +215,27 @@ test("setMusicTrack preserves an existing volume", () => {
 test("setMusicTrack throws on an unknown track id", () => {
   const dir = proj();
   expect(() => setMusicTrack(dir, "nope")).toThrow(/unknown/i);
+});
+
+test("setMusicEnabled toggles the soundtrack while preserving the track", () => {
+  const dir = proj();
+  let m = loadManifest(dir);
+  m.music = { trackId: "mamoun-statement-1", path: "assets/music/mamoun-statement-1.mp3", volume: 0.2, enabled: false };
+  saveManifest(dir, m);
+
+  setMusicEnabled(dir, true);
+  m = loadManifest(dir);
+  expect(m.music?.enabled).toBe(true);
+  expect(m.music?.trackId).toBe("mamoun-statement-1"); // track + volume remembered
+  expect(m.music?.volume).toBe(0.2);
+
+  setMusicEnabled(dir, false);
+  expect(loadManifest(dir).music?.enabled).toBe(false);
+  expect(loadManifest(dir).music?.trackId).toBe("mamoun-statement-1");
+});
+
+test("setMusicEnabled is a no-op when no track is staged", () => {
+  const dir = proj();
+  setMusicEnabled(dir, true);
+  expect(loadManifest(dir).music).toBeUndefined();
 });

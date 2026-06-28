@@ -100,6 +100,16 @@ export function setMusicTrack(dir: string, trackId: string, opts: { musicLibDir?
     trackId: track.id,
     path: `assets/music/${track.file}`,
     volume: m.music?.volume ?? DEFAULT_MUSIC_VOLUME,
+    enabled: m.music?.enabled ?? true, // picking a track keeps/turns the soundtrack on
   };
+  saveManifest(dir, m);
+}
+
+// Flip the "Add Music Track" toggle. The chosen track + volume are preserved
+// while disabled, so turning it back on restores the same soundtrack.
+export function setMusicEnabled(dir: string, enabled: boolean): void {
+  const m = loadManifest(dir);
+  if (!m.music) return; // nothing pre-staged yet; assemble auto-stages a track
+  m.music = { ...m.music, enabled };
   saveManifest(dir, m);
 }

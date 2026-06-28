@@ -53,11 +53,14 @@ const TitleSchema = z.object({
 export type Title = z.infer<typeof TitleSchema>;
 
 // The background-music selection: which catalog track, where its file was copied
-// into the project, and its mix volume (0..1).
+// into the project, its mix volume (0..1), and whether it's applied (the "Add
+// Music Track" toggle — a track stays remembered while disabled). Optional +
+// defaulting omitted/undefined to disabled keeps soundtrack opt-in.
 const MusicSchema = z.object({
   trackId: z.string(),
   path: z.string(),
   volume: z.number(),
+  enabled: z.boolean().optional(),
 });
 export type Music = z.infer<typeof MusicSchema>;
 
