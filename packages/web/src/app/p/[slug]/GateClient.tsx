@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { Manifest, StageName } from "@doc/core";
+import PronunciationPanel from "./PronunciationPanel";
 
 const ORDER: StageName[] = ["script", "shotlist", "images", "voiceover", "assemble"];
 const GATE_NO: Record<StageName, string> = { script: "1", shotlist: "2", images: "3", voiceover: "4", assemble: "5" };
@@ -36,6 +37,7 @@ export function GateClient({ slug, initial, tracks }: {
   const [videoReady, setVideoReady] = useState(false);
   // Bumped after each render to bust the browser cache of the <video>/download.
   const [videoVersion, setVideoVersion] = useState(0);
+  const [voiceoverTab, setVoiceoverTab] = useState<"segments" | "pronunciation">("segments");
 
   const checkVideo = async () => {
     const res = await fetch(`/api/projects/${slug}/video`, { method: "HEAD" }).catch(() => null);
@@ -347,21 +349,51 @@ export function GateClient({ slug, initial, tracks }: {
 
         {/* Gate 4: voiceover */}
         {viewing === "voiceover" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {m.segments.map((s) => (
-              <div key={s.id} className="ds-card" style={{ padding: 14, display: "flex", alignItems: "center",
-                gap: 14, flexWrap: "wrap" }}>
-                <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)", flex: "none" }}>{s.id}</span>
-                <span style={{ flex: 1, minWidth: 160, color: "var(--text-body)" }}>{s.narration.slice(0, 56)}…</span>
-                {s.audio
-                  ? <audio controls src={`/api/assets/${slug}/audio/${s.id}.wav`} style={{ height: 34 }} />
-                  : <span style={{ color: "var(--text-disabled)", fontSize: 13 }}>— not generated yet —</span>}
-                {editable && (
-                  <button className="btn btn--secondary btn--sm" disabled={!!busy}
-                    onClick={() => post("segments", { op: "rejectAudio", id: s.id })}>Re-record</button>
-                )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              {([["segments", "Audio Segments"], ["pronunciation", "Pronunciation"]] as const).map(([id, label]) => {
+                const on = voiceoverTab === id;
+                return (
+                  <button key={id} onClick={() => setVoiceoverTab(id)} className="btn btn--sm"
+                    style={{
+                      fontWeight: 600,
+                      color: on ? "var(--color-accent)" : "var(--text-body)",
+                      background: on ? "var(--color-accent-tint)" : "transparent",
+                      border: `1px solid ${on ? "var(--color-accent)" : "var(--border-card)"}`,
+                    }}>
+                    {label}
+                    {id === "pronunciation" && (
+                      <span className="mono" style={{ marginLeft: 7, fontSize: 11, color: on ? "var(--color-accent)" : "var(--text-meta)", background: "var(--surface-code)", border: "1px solid var(--border-hairline)", borderRadius: 999, padding: "1px 7px" }}>
+                        {m.pronunciations?.length ?? 0}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {voiceoverTab === "segments" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {m.segments.map((s) => (
+                  <div key={s.id} className="ds-card" style={{ padding: 14, display: "flex", alignItems: "center",
+                    gap: 14, flexWrap: "wrap" }}>
+                    <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)", flex: "none" }}>{s.id}</span>
+                    <span style={{ flex: 1, minWidth: 160, color: "var(--text-body)" }}>{s.narration.slice(0, 56)}…</span>
+                    {s.audio
+                      ? <audio controls src={`/api/assets/${slug}/audio/${s.id}.wav`} style={{ height: 34 }} />
+                      : <span style={{ color: "var(--text-disabled)", fontSize: 13 }}>— not generated yet —</span>}
+                    {editable && (
+                      <button className="btn btn--secondary btn--sm" disabled={!!busy}
+                        onClick={() => post("segments", { op: "rejectAudio", id: s.id })}>Re-record</button>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+
+            {voiceoverTab === "pronunciation" && (
+              <PronunciationPanel entries={m.pronunciations ?? []} post={post} longPost={longPost} busy={busy} />
+            )}
           </div>
         )}
 
