@@ -111,6 +111,7 @@ export function GateClient({ slug, initial, tracks }: {
       clearInterval(poll);
       setBusy(null);
     }
+    setAssetV((v) => v + 1); // bust cached asset URLs after a run (e.g. regenerated stills)
     return refresh();
   };
 
