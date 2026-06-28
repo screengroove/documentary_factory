@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createProject, loadManifest, saveManifest, type Still, type Title } from "@doc/core";
-import { approveStage, editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage, setMusicTrack, setMusicEnabled } from "./edits.js";
+import { approveStage, editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage, setMusicTrack, setMusicEnabled, setPronunciations, prepareReRecord } from "./edits.js";
 
 const dirs: string[] = [];
 function proj() {
@@ -238,4 +238,34 @@ test("setMusicEnabled is a no-op when no track is staged", () => {
   const dir = proj();
   setMusicEnabled(dir, true);
   expect(loadManifest(dir).music).toBeUndefined();
+});
+
+test("setPronunciations saves entries, drops blanks, is allowed after approval, leaves audio", () => {
+  const dir = proj();
+  let m = loadManifest(dir);
+  m.stages.voiceover.status = "approved";
+  m.segments = [{ id: "seg-001", order: 0, narration: "arsenic", audio: { path: "a", durationSec: 1, words: [] } }];
+  saveManifest(dir, m);
+  setPronunciations(dir, [{ term: "arsenic", respelling: "AR-suh-nik" }, { term: "", respelling: "x" }]);
+  m = loadManifest(dir);
+  expect(m.pronunciations).toEqual([{ term: "arsenic", respelling: "AR-suh-nik" }]); // blank dropped
+  expect(m.segments[0].audio).toBeDefined();                                          // non-destructive
+});
+
+test("prepareReRecord clears audio for term-containing segments only and resets assemble", () => {
+  const dir = proj();
+  let m = loadManifest(dir);
+  m.stages.assemble.status = "approved";
+  m.pronunciations = [{ term: "arsenic", respelling: "AR-suh-nik" }];
+  m.segments = [
+    { id: "seg-001", order: 0, narration: "about arsenic", audio: { path: "a", durationSec: 1, words: [] } },
+    { id: "seg-002", order: 1, narration: "no match here", audio: { path: "b", durationSec: 1, words: [] } },
+  ];
+  saveManifest(dir, m);
+  const affected = prepareReRecord(dir);
+  m = loadManifest(dir);
+  expect(affected).toEqual(["seg-001"]);
+  expect(m.segments[0].audio).toBeUndefined();
+  expect(m.segments[1].audio).toBeDefined();
+  expect(m.stages.assemble.status).toBe("pending");
 });

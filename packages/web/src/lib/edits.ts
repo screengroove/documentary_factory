@@ -1,6 +1,6 @@
 import { copyFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { loadManifest, saveManifest, type StageName, type Still, CATALOG, trackSourcePath, DEFAULT_MUSIC_VOLUME } from "@doc/core";
+import { loadManifest, saveManifest, type StageName, type Still, type PronunciationEntry, applyPronunciations, CATALOG, trackSourcePath, DEFAULT_MUSIC_VOLUME } from "@doc/core";
 
 export function approveStage(dir: string, stage: StageName): void {
   const m = loadManifest(dir);
@@ -112,4 +112,33 @@ export function setMusicEnabled(dir: string, enabled: boolean): void {
   if (!m.music) return; // nothing pre-staged yet; assemble auto-stages a track
   m.music = { ...m.music, enabled };
   saveManifest(dir, m);
+}
+
+// Save the pronunciation dictionary. Non-destructive (never touches audio) and
+// allowed at any gate state — late pronunciation fixes are the point. Blank rows
+// are dropped. The audio only changes when the user runs the apply re-record.
+export function setPronunciations(dir: string, entries: PronunciationEntry[]): void {
+  const m = loadManifest(dir);
+  m.pronunciations = entries.filter((e) => e.term.trim() && e.respelling.trim());
+  saveManifest(dir, m);
+}
+
+// Stage a re-record: clear audio for every segment whose narration contains any
+// current dictionary term, reset the (now-stale) assemble render to pending, and
+// return the affected segment ids. The apply route then runs voiceover, which
+// regenerates exactly the cleared segments with the current dictionary.
+export function prepareReRecord(dir: string): string[] {
+  const m = loadManifest(dir);
+  const entries = m.pronunciations ?? [];
+  const affected: string[] = [];
+  for (const s of m.segments) {
+    if (!s.audio) continue;
+    if (applyPronunciations(s.narration, entries).used.length > 0) {
+      delete s.audio;
+      affected.push(s.id);
+    }
+  }
+  if (affected.length) m.stages.assemble.status = "pending";
+  saveManifest(dir, m);
+  return affected;
 }
