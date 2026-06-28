@@ -44,10 +44,15 @@ export default function Home() {
 
       <div style={{ padding: "40px 56px", maxWidth: 980, display: "flex", flexDirection: "column", gap: 32 }}>
         <section>
+          <div className="eyebrow" style={{ marginBottom: 14 }}>New documentary</div>
+          <CreateForm />
+        </section>
+
+        <section>
           <div className="eyebrow" style={{ marginBottom: 14 }}>Projects · {projects.length}</div>
           {projects.length === 0 ? (
             <div className="ds-card" style={{ padding: 24, color: "var(--text-meta)" }}>
-              No projects yet — create your first below.
+              No projects yet — create your first above.
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -62,11 +67,6 @@ export default function Home() {
               ))}
             </div>
           )}
-        </section>
-
-        <section>
-          <div className="eyebrow" style={{ marginBottom: 14 }}>New documentary</div>
-          <CreateForm />
         </section>
       </div>
     </main>
