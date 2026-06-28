@@ -101,6 +101,20 @@ export function GateClient({ slug, initial, tracks }: {
 
   const viewingStatus = m.stages[viewing].status;
 
+  // The active stage's action buttons — rendered in the top action bar for most
+  // stages, but side-by-side with the timeline summary on the assemble screen.
+  const stageButtons = (
+    <div style={{ display: "flex", gap: 12 }}>
+      <button className="btn btn--primary" disabled={!!busy}
+        onClick={() => longPost("run", { stage: active }, `Running “${active}”`)}>Run “{active}”</button>
+      <button className="btn btn--secondary" disabled={!!busy} onClick={approve}>Approve “{active}”</button>
+      {active === "assemble" && m.stages.voiceover.status === "approved" && (
+        <button className="btn btn--primary" disabled={!!busy}
+          onClick={renderVideo}>{videoReady ? "Re-render video" : "Render video"}</button>
+      )}
+    </div>
+  );
+
   return (
     <main style={{ minHeight: "100vh", background: "var(--surface-app)" }}>
       {/* Header */}
@@ -208,17 +222,9 @@ export function GateClient({ slug, initial, tracks }: {
           </div>
         )}
 
-        {/* Action bar */}
+        {/* Action bar — on the assemble screen the buttons move next to the timeline summary */}
         {editable ? (
-          <div style={{ display: "flex", gap: 12 }}>
-            <button className="btn btn--primary" disabled={!!busy}
-              onClick={() => longPost("run", { stage: active }, `Running “${active}”`)}>Run “{active}”</button>
-            <button className="btn btn--secondary" disabled={!!busy} onClick={approve}>Approve “{active}”</button>
-            {active === "assemble" && m.stages.voiceover.status === "approved" && (
-              <button className="btn btn--primary" disabled={!!busy}
-                onClick={renderVideo}>{videoReady ? "Re-render video" : "Render video"}</button>
-            )}
-          </div>
+          active === "assemble" ? null : stageButtons
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--text-meta)", fontSize: 13 }}>
             Read-only — this isn’t the active stage.
@@ -395,11 +401,13 @@ export function GateClient({ slug, initial, tracks }: {
                 )}
               </div>
             )}
-            <div className="ds-card" style={{ padding: 20, color: "var(--text-body)" }}>
+            <div className="ds-card" style={{ padding: 20, color: "var(--text-body)", display: "flex",
+              alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
               {m.timeline
                 ? <span className="mono" style={{ color: "var(--color-cyan)", fontSize: 13 }}>
                     timeline · {m.segments.length} segments · {m.timeline.totalDurationSec.toFixed(1)}s @ {m.timeline.fps}fps</span>
-                : "Run assemble to derive the timeline, then Render video."}
+                : <span>Run assemble to derive the timeline, then Render video.</span>}
+              {editable && stageButtons}
             </div>
             {videoReady && (
               <div className="ds-card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
