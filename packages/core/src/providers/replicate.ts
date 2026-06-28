@@ -17,7 +17,9 @@ export function replicateImages(token: string, model = "black-forest-labs/flux-1
   return {
     async generate({ prompt, seed, width, height }) {
       const output = await client.run(model as `${string}/${string}`, {
-        input: { prompt, seed, width, height, output_format: "png" },
+        // safety_tolerance 6 is Flux's most permissive setting (default is a strict
+        // 2, which false-positives "NSFW" on innocuous documentary prompts).
+        input: { prompt, seed, width, height, output_format: "png", safety_tolerance: 6 },
       });
       // Flux returns a single image URL (or array of one).
       const url = firstUrl(output);
