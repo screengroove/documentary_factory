@@ -24,6 +24,27 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`badge ${meta.mod}`}><span className="dot" />{meta.label}</span>;
 }
 
+// Overlay shown on an image flagged for regeneration (image.needsRegen). While the
+// images stage is running it shows an active spinner; before the run it explains
+// the still is queued. Parent must be position: relative.
+function RegenOverlay({ running }: { running: boolean }) {
+  return (
+    <div style={{ position: "absolute", inset: 0, borderRadius: "var(--radius-sm)",
+      background: "rgba(7,9,12,0.62)", display: "flex", flexDirection: "column", gap: 8,
+      alignItems: "center", justifyContent: "center", textAlign: "center", padding: 8 }}>
+      {running ? (
+        <>
+          <span style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid var(--status-running)",
+            borderTopColor: "transparent", animation: "ds-spin 0.8s linear infinite" }} />
+          <span className="mono" style={{ fontSize: 12, color: "var(--text-heading)" }}>Regenerating…</span>
+        </>
+      ) : (
+        <span className="mono" style={{ fontSize: 11, color: "var(--status-review)" }}>↻ pending — Run to regenerate</span>
+      )}
+    </div>
+  );
+}
+
 export function GateClient({ slug, initial, tracks }: {
   slug: string; initial: Manifest; tracks: Array<{ id: string; title: string; composer: string }>;
 }) {
@@ -50,6 +71,7 @@ export function GateClient({ slug, initial, tracks }: {
   const active = activeStage(m);
   const editable = viewing === active;
   const viewIdx = ORDER.indexOf(viewing);
+  const imagesRunning = m.stages.images.status === "running";
 
   const refresh = async (): Promise<Manifest> => {
     const man = (await (await fetch(`/api/projects/${slug}/manifest`)).json()) as Manifest;
@@ -323,13 +345,16 @@ export function GateClient({ slug, initial, tracks }: {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <span className="mono" style={{ fontSize: 11, color: "var(--color-cyan)" }}>Title card</span>
                 <figure className="ds-card" style={{ margin: 0, padding: 10, overflow: "hidden", maxWidth: 360 }}>
-                  {m.title.image
-                    ? <img src={`/api/assets/${slug}/images/title.png`} alt="Title card"
-                        style={{ width: "100%", borderRadius: "var(--radius-sm)", display: "block",
-                          border: "1px solid var(--border-hairline)" }} />
-                    : <div style={{ width: "100%", aspectRatio: "16/9", borderRadius: "var(--radius-sm)",
-                        background: "var(--surface-code)", border: "1px solid var(--border-hairline)", display: "grid",
-                        placeItems: "center", color: "var(--text-disabled)", fontSize: 12 }}>not generated</div>}
+                  <div style={{ position: "relative" }}>
+                    {m.title.image
+                      ? <img src={`/api/assets/${slug}/images/title.png?v=${assetV}`} alt="Title card"
+                          style={{ width: "100%", borderRadius: "var(--radius-sm)", display: "block",
+                            border: "1px solid var(--border-hairline)" }} />
+                      : <div style={{ width: "100%", aspectRatio: "16/9", borderRadius: "var(--radius-sm)",
+                          background: "var(--surface-code)", border: "1px solid var(--border-hairline)", display: "grid",
+                          placeItems: "center", color: "var(--text-disabled)", fontSize: 12 }}>not generated</div>}
+                    {m.title.image?.needsRegen && <RegenOverlay running={imagesRunning} />}
+                  </div>
                   <figcaption style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
                     marginTop: 8 }}>
                     <span className="mono" style={{ fontSize: 11, color: "var(--text-meta)" }}>{m.title.text}</span>
@@ -348,13 +373,16 @@ export function GateClient({ slug, initial, tracks }: {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
                   {(s.stills ?? []).map((st, i) => (
                     <figure key={i} className="ds-card" style={{ margin: 0, padding: 10, overflow: "hidden" }}>
-                      {st.image
-                        ? <img src={`/api/assets/${slug}/${st.image.path.replace(/^assets\//, "")}?v=${assetV}`} alt={`${s.id} #${i + 1}`}
-                            style={{ width: "100%", borderRadius: "var(--radius-sm)", display: "block",
-                              border: "1px solid var(--border-hairline)" }} />
-                        : <div style={{ width: "100%", aspectRatio: "16/9", borderRadius: "var(--radius-sm)",
-                            background: "var(--surface-code)", border: "1px solid var(--border-hairline)", display: "grid",
-                            placeItems: "center", color: "var(--text-disabled)", fontSize: 12 }}>not generated</div>}
+                      <div style={{ position: "relative" }}>
+                        {st.image
+                          ? <img src={`/api/assets/${slug}/${st.image.path.replace(/^assets\//, "")}?v=${assetV}`} alt={`${s.id} #${i + 1}`}
+                              style={{ width: "100%", borderRadius: "var(--radius-sm)", display: "block",
+                                border: "1px solid var(--border-hairline)" }} />
+                          : <div style={{ width: "100%", aspectRatio: "16/9", borderRadius: "var(--radius-sm)",
+                              background: "var(--surface-code)", border: "1px solid var(--border-hairline)", display: "grid",
+                              placeItems: "center", color: "var(--text-disabled)", fontSize: 12 }}>not generated</div>}
+                        {st.image?.needsRegen && <RegenOverlay running={imagesRunning} />}
+                      </div>
                       <figcaption style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
                         marginTop: 8, gap: 6 }}>
                         <span className="mono" style={{ fontSize: 11, color: "var(--text-meta)" }}>#{i + 1}</span>
