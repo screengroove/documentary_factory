@@ -4,8 +4,10 @@ import { loadManifest, STAGE_NAMES, type StageName } from "@doc/core";
 
 export const PROJECTS_ROOT = join(process.cwd(), "..", "..", "projects");
 
+// The slug doubles as the project directory name; Linux caps a path component
+// at 255 bytes, so long pasted pitches must be truncated (ENAMETOOLONG otherwise).
 export function slugify(topic: string): string {
-  return topic.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return topic.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 80).replace(/^-+|-+$/g, "");
 }
 
 // Recursively delete a project directory. Validates that `slug` resolves to a

@@ -24,6 +24,14 @@ test("creates project dir, subdirs, and initial manifest", () => {
   expect(man.segments).toEqual([]);
 });
 
+test("createProject rejects an empty slug instead of writing into the root", () => {
+  const root = tmp();
+  expect(() => createProject(root, "", {
+    topic: "🎬", targetMinutes: 6, tone: "calm", aspectRatio: "16:9", imageStyle: "film",
+  }, "2026-06-26T00:00:00.000Z")).toThrow(/slug/i);
+  expect(existsSync(join(root, "manifest.json"))).toBe(false);
+});
+
 test("createProject creates the music asset dir", () => {
   const root = mkdtempSync(join(tmpdir(), "root-"));
   const dir = createProject(root, "doc", {

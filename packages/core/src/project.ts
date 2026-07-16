@@ -15,6 +15,9 @@ export function projectPaths(projectDir: string) {
 }
 
 export function createProject(rootDir: string, slug: string, brief: Brief, now: string): string {
+  // An empty slug would resolve to rootDir itself and write a manifest into the
+  // projects root (e.g. a topic with no latin letters slugifies to "").
+  if (!slug) throw new Error("Project slug is empty — the topic needs letters or numbers");
   const dir = join(rootDir, slug);
   const p = projectPaths(dir);
   for (const d of [p.images, p.audio, p.music, p.out, p.runs]) mkdirSync(d, { recursive: true });
