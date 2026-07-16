@@ -1,33 +1,8 @@
-import Link from "next/link";
 import { listProjects } from "@/lib/projects";
 import { CreateForm } from "./CreateForm";
-import type { StageName } from "@doc/core";
+import { ProjectCard } from "./ProjectCard";
 
 export const dynamic = "force-dynamic";
-
-const STAGES: StageName[] = ["script", "shotlist", "images", "voiceover", "assemble"];
-
-const DOT: Record<string, string> = {
-  approved: "var(--status-approved)",
-  running: "var(--status-running)",
-  awaiting_review: "var(--status-review)",
-  error: "var(--status-error)",
-  pending: "var(--status-pending)",
-};
-
-function StatusDots({ status }: { status: Record<StageName, string> }) {
-  const done = STAGES.filter((s) => status[s] === "approved").length;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      {STAGES.map((s) => (
-        <span key={s} title={`${s}: ${status[s]}`}
-          style={{ width: 9, height: 9, borderRadius: "var(--radius-full)", background: DOT[status[s]] ?? DOT.pending,
-            animation: status[s] === "running" ? "ds-pulse 1.4s ease-in-out infinite" : undefined }} />
-      ))}
-      <span className="mono muted" style={{ marginLeft: 4, fontSize: 11 }}>{done}/5</span>
-    </div>
-  );
-}
 
 export default function Home() {
   const projects = listProjects();
@@ -57,13 +32,7 @@ export default function Home() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {projects.map((p) => (
-                <Link key={p.slug} href={`/p/${p.slug}`} className="ds-card"
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
-                    padding: "16px 18px", textDecoration: "none" }}>
-                  <span className="mono" style={{ color: "var(--text-heading)", fontSize: 13, overflow: "hidden",
-                    textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.slug}</span>
-                  <StatusDots status={p.status} />
-                </Link>
+                <ProjectCard key={p.slug} slug={p.slug} status={p.status} />
               ))}
             </div>
           )}
