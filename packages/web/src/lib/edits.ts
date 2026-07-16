@@ -130,6 +130,12 @@ export function setMusicEnabled(dir: string, enabled: boolean): void {
   saveManifest(dir, m);
 }
 
+export function setAutoMode(dir: string, enabled: boolean): void {
+  const m = loadManifest(dir);
+  m.brief.autoMode = enabled;
+  saveManifest(dir, m);
+}
+
 // Save the pronunciation dictionary. Non-destructive (never touches audio) and
 // allowed at any gate state — late pronunciation fixes are the point. Blank rows
 // are dropped. The audio only changes when the user runs the apply re-record.

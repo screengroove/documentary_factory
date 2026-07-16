@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createProject, loadManifest, saveManifest, type Still, type Title } from "@doc/core";
-import { approveStage, editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage, setMusicTrack, setMusicEnabled, setPronunciations, prepareReRecord, uploadStillImage } from "./edits.js";
+import { approveStage, editNarration, editPrompt, rejectImage, rejectAudio, editTitle, rejectTitleImage, setMusicTrack, setMusicEnabled, setAutoMode, setPronunciations, prepareReRecord, uploadStillImage } from "./edits.js";
 
 const dirs: string[] = [];
 function proj() {
@@ -238,6 +238,14 @@ test("setMusicEnabled is a no-op when no track is staged", () => {
   const dir = proj();
   setMusicEnabled(dir, true);
   expect(loadManifest(dir).music).toBeUndefined();
+});
+
+test("setAutoMode persists the flag both ways", () => {
+  const dir = proj();
+  setAutoMode(dir, true);
+  expect(loadManifest(dir).brief.autoMode).toBe(true);
+  setAutoMode(dir, false);
+  expect(loadManifest(dir).brief.autoMode).toBe(false);
 });
 
 test("uploadStillImage writes the file, removes the old one, records an upload image", () => {

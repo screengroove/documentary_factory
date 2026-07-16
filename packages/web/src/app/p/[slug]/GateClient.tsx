@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Manifest, StageName } from "@doc/core";
 import PronunciationPanel from "./PronunciationPanel";
+import { nextAutoStep, ORDER } from "./autoNext";
 
-const ORDER: StageName[] = ["script", "shotlist", "images", "voiceover", "assemble"];
 const GATE_NO: Record<StageName, string> = { script: "1", shotlist: "2", images: "3", voiceover: "4", assemble: "5" };
 
 // The active stage is the first one not yet approved — the only stage you can act on.
@@ -56,19 +56,24 @@ export function GateClient({ slug, initial, tracks }: {
   // tracked in the manifest, so probe the route to know whether a video exists
   // (also covers reloads where a prior render is still on the volume).
   const [videoReady, setVideoReady] = useState(false);
+  const [videoChecked, setVideoChecked] = useState(false);
   // Bumped after each render to bust the browser cache of the <video>/download.
   const [videoVersion, setVideoVersion] = useState(0);
   const [voiceoverTab, setVoiceoverTab] = useState<"segments" | "pronunciation">("segments");
   // Bumped after an image upload to bust the browser cache of the replaced still.
   const [assetV, setAssetV] = useState(0);
+  const autoActing = useRef(false);
+  const renderTried = useRef(false);
 
   const checkVideo = async () => {
     const res = await fetch(`/api/projects/${slug}/video`, { method: "HEAD" }).catch(() => null);
     setVideoReady(!!res?.ok);
+    setVideoChecked(true);
   };
   useEffect(() => { void checkVideo(); }, [slug]);
 
   const active = activeStage(m);
+  const auto = !!m.brief.autoMode;
   const editable = viewing === active;
   const viewIdx = ORDER.indexOf(viewing);
   const imagesRunning = m.stages.images.status === "running";
@@ -148,7 +153,40 @@ export function GateClient({ slug, initial, tracks }: {
     await checkVideo();
   };
 
+  useEffect(() => {
+    if (!auto || busy || actionError || autoActing.current) return;
+    const step = nextAutoStep(m, videoReady);
+    if (step.kind === "wait") return;
+    if (step.kind === "render" && !videoChecked) return;
+    if (step.kind === "render" && renderTried.current) return;
+
+    autoActing.current = true;
+    if (step.kind === "render") renderTried.current = true;
+    void (async () => {
+      try {
+        if (step.kind === "run" && step.stage) {
+          await longPost("run", { stage: step.stage }, `Running “${step.stage}”`);
+        } else if (step.kind === "approve") {
+          await approve();
+        } else if (step.kind === "render") {
+          await renderVideo();
+        }
+      } finally {
+        autoActing.current = false;
+      }
+    })();
+  }, [auto, m, busy, actionError, videoReady, videoChecked]);
+
+  // A stage run continues on the server if this page reloads. Poll its persisted
+  // state so auto mode can pick back up when it reaches awaiting_review.
+  useEffect(() => {
+    if (!auto || busy || m.stages[active].status !== "running") return;
+    const poll = setInterval(() => { void refresh(); }, 2500);
+    return () => clearInterval(poll);
+  }, [auto, busy, active, m.stages[active].status]);
+
   const viewingStatus = m.stages[viewing].status;
+  const autoPaused = !!actionError || ORDER.some((stage) => m.stages[stage].status === "error");
 
   // The active stage's action buttons — rendered in the top action bar for most
   // stages, but side-by-side with the timeline summary on the assemble screen.
@@ -249,6 +287,20 @@ export function GateClient({ slug, initial, tracks }: {
         </div>
 
         {/* Messages */}
+        {auto && (
+          <div className="ds-card" style={{ padding: "12px 16px", borderColor: autoPaused ? "var(--status-error-border)" : "var(--status-running-border)",
+            background: autoPaused ? "var(--status-error-tint)" : "var(--status-running-tint)",
+            color: autoPaused ? "var(--status-error)" : "var(--status-running)", display: "flex",
+            alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+            <span><strong>Auto mode</strong> — {autoPaused
+              ? "Paused on an error — fix it below and auto mode will continue."
+              : "stages run and approve automatically through the final render."}</span>
+            <button className="btn btn--secondary btn--sm" disabled={!!busy}
+              onClick={() => post("segments", { op: "setAutoMode", enabled: false })}>
+              Switch to manual
+            </button>
+          </div>
+        )}
         {m.stages[viewing].error && (
           <div className="ds-card" style={{ padding: "12px 16px", borderColor: "var(--status-error-border)",
             background: "var(--status-error-tint)", color: "var(--status-error)" }}>

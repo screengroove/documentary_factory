@@ -94,6 +94,7 @@ export const ManifestSchema = z.object({
     audience: z.string().optional(),
     aspectRatio: z.enum(["16:9", "9:16"]),
     imageStyle: z.string(),
+    autoMode: z.boolean().optional(),
   }),
   stages: z.object(
     Object.fromEntries(STAGE_NAMES.map((n) => [n, StageStateSchema])) as Record<

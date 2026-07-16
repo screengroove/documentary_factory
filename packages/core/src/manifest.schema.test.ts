@@ -27,6 +27,16 @@ test("accepts a minimal valid manifest", () => {
   expect(parsed.slug).toBe("test-doc");
 });
 
+test("accepts auto mode in the brief", () => {
+  const parsed = ManifestSchema.parse({ ...minimal, brief: { ...minimal.brief, autoMode: true } });
+  expect(parsed.brief.autoMode).toBe(true);
+});
+
+test("keeps auto mode optional for existing manifests", () => {
+  const parsed = ManifestSchema.parse(minimal);
+  expect(parsed.brief.autoMode).toBeUndefined();
+});
+
 test("rejects an unknown aspectRatio", () => {
   const bad = { ...minimal, brief: { ...minimal.brief, aspectRatio: "4:3" } };
   expect(() => ManifestSchema.parse(bad)).toThrow();
